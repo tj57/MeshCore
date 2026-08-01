@@ -1,128 +1,167 @@
-## About MeshCore
+# MeshCore + mcRPC
 
-MeshCore is a lightweight, portable C++ library that enables multi-hop packet routing for embedded projects using LoRa and other packet radios. It is designed for developers who want to create resilient, decentralized communication networks that work without the internet.
+Long-term maintainable extension of [MeshCore](https://github.com/meshcore-dev/MeshCore) that adds **mcRPC** — a human-readable application protocol for Home Assistant, CLI tools, and embedded nodes.
 
-## 🔍 What is MeshCore?
+This repository is a clean checkout of upstream MeshCore on branch `mcrpc`. All mcRPC work is additive so upstream merges stay small.
 
-MeshCore now supports a range of LoRa devices, allowing for easy flashing without the need to compile firmware manually. Users can flash a pre-built binary using tools like Adafruit ESPTool and interact with the network through a serial console.
-MeshCore provides the ability to create wireless mesh networks, similar to Meshtastic and Reticulum but with a focus on lightweight multi-hop packet routing for embedded projects. Unlike Meshtastic, which is tailored for casual LoRa communication, or Reticulum, which offers advanced networking, MeshCore balances simplicity with scalability, making it ideal for custom embedded solutions, where devices (nodes) can communicate over long distances by relaying messages through intermediate nodes. This is especially useful in off-grid, emergency, or tactical situations where traditional communication infrastructure is unavailable.
+## Project goals
 
-## ⚡ Key Features
+- Keep MeshCore radio/routing/crypto untouched
+- Speak a stable text protocol over private group channels
+- Organize firmware around **features**, not boards
+- Register commands — never grow giant `switch` / `if (cmd == …)` trees
+- Remain easy to sync with upstream for the next five years
 
-* Multi-Hop Packet Routing
-  * Devices can forward messages across multiple nodes, extending range beyond a single radio's reach.
-  * Supports up to a configurable number of hops to balance network efficiency and prevent excessive traffic.
-  * Nodes use fixed roles where "Companion" nodes are not repeating messages at all to prevent adverse routing paths from being used.
-* Supports LoRa Radios – Works with Heltec, RAK Wireless, and other LoRa-based hardware.
-* Decentralized & Resilient – No central server or internet required; the network is self-healing.
-* Low Power Consumption – Ideal for battery-powered or solar-powered devices.
-* Simple to Deploy – Pre-built example applications make it easy to get started.
+## Architecture
 
-## 🎯 What Can You Use MeshCore For?
-
-* Off-Grid Communication: Stay connected even in remote areas.
-* Emergency Response & Disaster Recovery: Set up instant networks where infrastructure is down.
-* Outdoor Activities: Hiking, camping, and adventure racing communication.
-* Tactical & Security Applications: Military, law enforcement, and private security use cases.
-* IoT & Sensor Networks: Collect data from remote sensors and relay it back to a central location.
-
-## 🚀 How to Get Started
-
-- Watch the [MeshCore QuickStart Playlist](https://www.youtube.com/watch?v=iaFltojJrAc&list=PLshzThxhw4O4WU_iZo3NmNZOv6KMrUuF9) by The Comms Channel
-- Watch the [MeshCore Technical Presentation](https://www.youtube.com/watch?v=OwmkVkZQTf4) by Liam Cottle.
-- Read through our [Frequently Asked Questions](./docs/faq.md) and [Documentation](https://docs.meshcore.io).
-- Flash the MeshCore firmware on a supported device.
-- Connect with a supported client.
-
-For developers:
-
-- Install [PlatformIO](https://docs.platformio.org) in [Visual Studio Code](https://code.visualstudio.com).
-- Clone and open the MeshCore repository in Visual Studio Code.
-- See the example applications you can modify and run:
-  - [Companion Radio](./examples/companion_radio) - For use with an external chat app, over BLE, USB or Wi-Fi.
-  - [KISS Modem](./examples/kiss_modem) - Serial KISS protocol bridge for host applications. ([protocol docs](./docs/kiss_modem_protocol.md))
-  - [Simple Repeater](./examples/simple_repeater) - Extends network coverage by relaying messages.
-  - [Simple Room Server](./examples/simple_room_server) - A simple BBS server for shared Posts.
-  - [Simple Secure Chat](./examples/simple_secure_chat) - Secure terminal based text communication between devices.
-  - [Simple Sensor](./examples/simple_sensor) - Remote sensor node with telemetry and alerting.
-
-The Simple Secure Chat example can be interacted with through the Serial Monitor in Visual Studio Code, or with a Serial USB Terminal on Android.
-
-## ⚡️ MeshCore Flasher
-
-We have prebuilt firmware ready to flash on supported devices.
-
-- Launch https://meshcore.io/flasher
-- Select a supported device
-- Flash one of the firmware types:
-  - Companion, Repeater or Room Server
-- Once flashing is complete, you can connect with one of the MeshCore clients below.
-
-## 📱 MeshCore Clients
-
-**Companion Firmware**
-
-The companion firmware can be connected to via BLE, USB or Wi-Fi depending on the firmware type you flashed.
-
-- Web: https://app.meshcore.nz
-- Android: https://play.google.com/store/apps/details?id=com.liamcottle.meshcore.android
-- iOS: https://apps.apple.com/us/app/meshcore/id6742354151?platform=iphone
-- NodeJS: https://github.com/liamcottle/meshcore.js
-- Python: https://github.com/fdlamotte/meshcore-cli
-
-**Repeater and Room Server Firmware**
-
-The repeater and room server firmware can be set up via USB in the web config tool.
-
-- https://config.meshcore.io
-
-They can also be managed via LoRa in the mobile app by using the Remote Management feature.
-
-## 🛠 Hardware Compatibility
-
-MeshCore is designed for devices listed in the [MeshCore Flasher](https://meshcore.io/flasher)
-
-## 📜 License
-
-MeshCore is open-source software released under the MIT License. You are free to use, modify, and distribute it for personal and commercial projects.
-
-## Contributing
-
-Please submit PR's using 'dev' as the base branch!
-For minor changes just submit your PR and we'll try to review it, but for anything more 'impactful' please open an Issue first and start a discussion. It is better to sound out what it is you want to achieve first, and try to come to a consensus on what the best approach is, especially when it impacts the structure or architecture of this codebase.
-
-Here are some general principles you should try to adhere to:
-* Keep it simple. Please, don't think like a high-level lang programmer. Think embedded, and keep code concise, without any unnecessary layers.
-* No dynamic memory allocation, except during setup/begin functions.
-* Use the same brace and indenting style that's in the core source modules. (A .clang-format is probably going to be added soon, but please do NOT retroactively re-format existing code. This just creates unnecessary diffs that make finding problems harder)
-
-Help us prioritize! Please react with thumbs-up to issues/PRs you care about most. We look at reaction counts when planning work.
-
-### Running unit tests
-
-To run unit tests, run the following command:
-
-```bash
-pio test --environment native --verbose
+```
+Radio
+  → MeshCore (Packet / Dispatcher / Mesh)
+    → Configuration (NodePrefs + /mcrpc_cfg)
+      → Feature Manager
+        → mcRPC (Parser → Dispatcher → Registry)
+          → Features (gps, button, battery, …)
+            → HostServices (board callbacks)
 ```
 
-## Road-Map / To-Do
+| Layer | Owns | Must not know |
+|-------|------|----------------|
+| Parser | Grammar only | Hardware, MeshCore |
+| Registry | Command → handler | Pins, radios |
+| Features | Commands + events | Packet wire format |
+| HostServices | Battery/GPS/button IO | Protocol grammar |
+| McRpcMesh | Group-channel transport | Feature internals |
 
-There are a number of fairly major features in the pipeline, with no particular time-frames attached yet. In very rough chronological order:
-- [X] Companion radio: UI redesign
-- [X] Repeater + Room Server: add ACL's (like Sensor Node has)
-- [X] Standardise Bridge mode for repeaters
-- [ ] Repeater/Bridge: Standardise the Transport Codes for zoning/filtering
-- [X] Core + Repeater: enhanced zero-hop neighbour discovery
-- [ ] Core: round-trip manual path support
-- [ ] Companion + Apps: support for multiple sub-meshes (and 'off-grid' client repeat mode)
-- [ ] Core + Apps: support for LZW message compression
-- [ ] Core: dynamic CR (Coding Rate) for weak vs strong hops
-- [ ] Core: new framework for hosting multiple virtual nodes on one physical device
-- [ ] V2 protocol spec: discussion and consensus around V2 packet protocol, including path hashes, new encryption specs, etc
+See [doc/mcRPC-ARCHITECTURE.md](doc/mcRPC-ARCHITECTURE.md).
 
-## 📞 Get Support
+## mcRPC
 
-- Report bugs and request features on the [GitHub Issues](https://github.com/ripplebiz/MeshCore/issues) page.
-- Find additional guides and components on [my site](https://buymeacoffee.com/ripplebiz).
-- Join [MeshCore Discord](https://meshcore.gg) to chat with the developers and get help from the community.
+Text protocol (v1). Example session on channel `#mych`:
+
+```
+tracker#18 gps
+→ tracker: #18 gps lat=50.12 lon=19.93 alt=231.0 sat=12
+
+button ping
+→ button: pong
+
+all discover
+→ tracker profile=tracker fw=mcrpc-0.1.0
+```
+
+Full grammar and semantics: [doc/mcRPC-CORE.md](doc/mcRPC-CORE.md).
+
+## Supported mcRPC targets
+
+| Env | Board | Profile | Features |
+|-----|-------|---------|----------|
+| `Heltec_v3_mcrpc_button` | Heltec WiFi LoRa 32 V3 | switch | button, battery, core |
+| `LW010_mcrpc_gps` | MOKO LW010-R / RAK WisMesh Tag | tracker | gps, button, battery, core |
+| `RAK_WisMesh_Tag_mcrpc_gps` | same hardware | tracker | same |
+
+Upstream MeshCore still supports ~79 board variants / 500+ envs — see [doc/BOARDS.md](doc/BOARDS.md).
+
+## Building
+
+Docker (recommended on this host):
+
+```bash
+# Heltec V3 button
+docker run --rm -v "$PWD:/workspace" -v heltec-button_pio-cache:/opt/platformio \
+  -w /workspace -e PLATFORMIO_CORE_DIR=/opt/platformio \
+  meshcore-heltec-button:latest \
+  bash -lc 'pio run -e Heltec_v3_mcrpc_button'
+
+# LW010 GPS
+docker run --rm -v "$PWD:/workspace" -v meshcore_pio-cache:/opt/platformio \
+  -w /workspace -e PLATFORMIO_CORE_DIR=/opt/platformio \
+  meshcore-lw010-gps:latest \
+  bash -lc 'pio run -e LW010_mcrpc_gps'
+```
+
+Local PlatformIO:
+
+```bash
+pio run -e Heltec_v3_mcrpc_button
+pio run -e LW010_mcrpc_gps
+```
+
+Host unit tests (parser / registry / dispatcher):
+
+```bash
+g++ -std=c++17 -I src -o /tmp/test_mcrpc \
+  test/mcrpc/test_mcrpc.cpp \
+  src/mcrpc/Parser.cpp src/mcrpc/Registry.cpp \
+  src/mcrpc/Dispatcher.cpp src/mcrpc/FeatureManager.cpp
+/tmp/test_mcrpc
+```
+
+## Configuration
+
+| Store | Path | Contents |
+|-------|------|----------|
+| MeshCore `NodePrefs` | `/com_prefs` | node name, radio, admin password (unchanged) |
+| mcRPC `Config` | `/mcrpc_cfg` | profile, channel name, channel PSK, feature flags |
+
+**Private channels** reuse MeshCore group crypto: 16/32-byte PSK → SHA-256 → 1-byte channel hash on the wire. There is no join handshake — knowing the PSK is membership.
+
+Default LW010 channel: name `mych`, PSK ASCII `mych-gps-channel` (base64 `bXljaC1ncHMtY2hhbm5lbA==`).
+
+Change defaults via build flags `MCRPC_DEFAULT_*` or persist new values in `/mcrpc_cfg`.
+
+## Adding a new feature
+
+1. Create `src/mcrpc/features/<name>/`
+2. Subclass `mcrpc::Feature`, implement `registerCommands()`
+3. Use `HostServices` for hardware — never parse packets in the feature
+4. Add the feature in `McRpcMesh::beginMcRpc()` behind a `MCRPC_ENABLE_*` flag
+5. Document it in [doc/FEATURES.md](doc/FEATURES.md)
+
+## Adding a new board
+
+1. Prefer an existing `variants/<board>/` from upstream
+2. Append an `[env:…_mcrpc_…]` block at the **end** of that variant’s `platformio.ini` (do not rewrite upstream envs)
+3. Select features with `-D MCRPC_ENABLE_*`
+4. Document in [doc/BOARDS.md](doc/BOARDS.md)
+
+## Relationship with upstream MeshCore
+
+| Path | Policy |
+|------|--------|
+| `src/Mesh*.cpp`, `Dispatcher.*`, `Packet.*` | Do not modify |
+| `src/helpers/**` (upstream) | Prefer extend, avoid edit |
+| `src/mcrpc/**` | mcRPC-owned |
+| `examples/mcrpc/**` | mcRPC-owned |
+| `variants/*/platformio.ini` | Append-only env blocks |
+| `doc/mcRPC-*.md`, `doc/state.md` | mcRPC-owned |
+
+Sync:
+
+```bash
+git fetch origin
+git merge origin/main   # or rebase onto origin/dev if that is your upstream track
+```
+
+Conflict hotspots to watch: giant `examples/*/MyMesh.cpp`, `CommonCLI` prefs layout, mid-file variant env edits. Keeping mcRPC additive avoids most of them.
+
+## Roadmap
+
+See [doc/state.md](doc/state.md) and [doc/mcRPC-DEVELOPMENT.md](doc/mcRPC-DEVELOPMENT.md).
+
+Near term: relay/display/LED features, Home Assistant MQTT bridge notes, deeper native tests, OTA profile.
+
+## Documentation index
+
+| Doc | Purpose |
+|-----|---------|
+| [doc/state.md](doc/state.md) | Living architecture analysis |
+| [doc/mcRPC-CORE.md](doc/mcRPC-CORE.md) | Protocol specification |
+| [doc/mcRPC-ARCHITECTURE.md](doc/mcRPC-ARCHITECTURE.md) | Layer design |
+| [doc/mcRPC-PROFILES.md](doc/mcRPC-PROFILES.md) | Device profiles |
+| [doc/mcRPC-DEVELOPMENT.md](doc/mcRPC-DEVELOPMENT.md) | Contributor guide |
+| [doc/FEATURES.md](doc/FEATURES.md) | Feature catalog |
+| [doc/BOARDS.md](doc/BOARDS.md) | Board inventory |
+
+## License
+
+Same as upstream MeshCore (see `license.txt`).
