@@ -77,3 +77,10 @@ Docs in the HA repo: `docs/MCRPC.md`, `docs/ARCHITECTURE_MCRPC.md`,
 
 Implemented in **tj57/meshcore-ha** (`mcrpc` branch). This MeshCore tree only
 documents the consumer relationship.
+
+---
+
+## Chat transport note
+
+Home Assistant answers channel text from MeshCore Chat (not only
+`meshcore.request`). See meshcore-ha `docs/MCRPC.md` § Chat transport.
