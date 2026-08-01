@@ -4,12 +4,17 @@
 
 namespace mcrpc {
 
-/** Placeholder — registers commands that return err unsupported until IO lands. */
 class RelayFeature : public Feature {
 public:
   explicit RelayFeature(HostServices& host) : _host(host) {}
   const char* name() const override { return "relay"; }
-  void registerCommands(Registry& registry) override;
+  void registerCommands(CommandRegistry& commands) override;
+  void registerCapabilities(CapabilityRegistry& caps) override {
+    caps.registerCapability("relay");
+  }
+  void contributeDiscover(DiscoverBuilder& discover) override {
+    discover.add("relay", "yes");
+  }
 
 private:
   HostServices& _host;

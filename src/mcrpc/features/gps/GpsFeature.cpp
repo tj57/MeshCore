@@ -1,17 +1,38 @@
 #include "GpsFeature.h"
 
-#include "../../McRpc.h"
 #include <stdio.h>
+#include <string.h>
 
 namespace mcrpc {
 
 static GpsFeature* g_gps = nullptr;
 
-void GpsFeature::registerCommands(Registry& registry) {
+void GpsFeature::registerCommands(CommandRegistry& commands) {
   g_gps = this;
-  registry.registerCommand("gps", &GpsFeature::cmdGps, "get GPS fix", "gps");
-  registry.registerCommand("location", &GpsFeature::cmdLocation, "alias for gps", "gps");
-  registry.registerCommand("track", &GpsFeature::cmdTrack, "request/track fix", "gps");
+  commands.registerCommand("gps", &GpsFeature::cmdGps, "get GPS fix");
+  commands.registerCommand("location", &GpsFeature::cmdLocation, "alias for gps");
+  commands.registerCommand("track", &GpsFeature::cmdTrack, "request/track fix");
+}
+
+void GpsFeature::registerCapabilities(CapabilityRegistry& caps) {
+  caps.registerCapability("gps");
+}
+
+void GpsFeature::contributeStatus(StatusBuilder& status) {
+  GpsFix fix;
+  memset(&fix, 0, sizeof(fix));
+  if (_host.readGps(fix) && fix.valid) {
+    status.add("gps", "fix");
+    status.add("sat", fix.sats);
+  } else if (_host.gpsBusy()) {
+    status.add("gps", "busy");
+  } else {
+    status.add("gps", "nofix");
+  }
+}
+
+void GpsFeature::contributeDiscover(DiscoverBuilder& discover) {
+  discover.add("gps", "yes");
 }
 
 bool GpsFeature::writeFix(CommandContext& ctx, bool request_if_missing) {
@@ -43,7 +64,6 @@ bool GpsFeature::writeFix(CommandContext& ctx, bool request_if_missing) {
 }
 
 bool GpsFeature::cmdGps(CommandContext& ctx) {
-  // Optional arg: "on" | "off" | "status" | (none = read/request)
   if (ctx.request->argc >= 1) {
     if (ieq(ctx.request->args[0], "status")) {
       GpsFix fix;
@@ -68,7 +88,6 @@ bool GpsFeature::cmdLocation(CommandContext& ctx) {
 }
 
 bool GpsFeature::cmdTrack(CommandContext& ctx) {
-  (void)ctx;
   if (!g_gps) return false;
   if (g_gps->_host.gpsBusy()) {
     ctx.reply->clear();

@@ -2,7 +2,6 @@
 
 #include "../../Feature.h"
 #include "../../HostServices.h"
-#include "../../McRpc.h"
 
 namespace mcrpc {
 
@@ -12,7 +11,10 @@ public:
 
   const char* name() const override { return "battery"; }
 
-  void registerCommands(Registry& registry) override;
+  void registerCommands(CommandRegistry& commands) override;
+  void registerCapabilities(CapabilityRegistry& caps) override;
+  void contributeStatus(StatusBuilder& status) override;
+  void contributeDiscover(DiscoverBuilder& discover) override;
   void loop() override;
 
   void setLowThresholdVolts(float v) { _low_v = v; }

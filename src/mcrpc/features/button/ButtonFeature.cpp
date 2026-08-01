@@ -6,20 +6,30 @@ namespace mcrpc {
 
 static ButtonFeature* g_btn = nullptr;
 
-void ButtonFeature::registerCommands(Registry& registry) {
+void ButtonFeature::registerCommands(CommandRegistry& commands) {
   g_btn = this;
-  registry.registerCommand("button", &ButtonFeature::cmdButton, "button info", "button");
-  registry.registerCommand("button_state", &ButtonFeature::cmdButtonState, "pressed?", "button");
+  commands.registerCommand("button", &ButtonFeature::cmdButton, "button info");
+  commands.registerCommand("button_state", &ButtonFeature::cmdButtonState, "pressed?");
+}
+
+void ButtonFeature::registerCapabilities(CapabilityRegistry& caps) {
+  caps.registerCapability("button");
+}
+
+void ButtonFeature::contributeStatus(StatusBuilder& status) {
+  status.add("button_count", (unsigned long)_press_count);
+}
+
+void ButtonFeature::contributeDiscover(DiscoverBuilder& discover) {
+  discover.add("button", "yes");
 }
 
 void ButtonFeature::notifyPressed() {
   _pressed = true;
   _press_count++;
-  if (_host.engine) {
-    char kv[40];
-    snprintf(kv, sizeof(kv), "count=%lu", (unsigned long)_press_count);
-    _host.engine->publishEvent("button_pressed", kv);
-  }
+  char kv[40];
+  snprintf(kv, sizeof(kv), "count=%lu", (unsigned long)_press_count);
+  publishEvent("button_pressed", kv);
   _pressed = false;
 }
 

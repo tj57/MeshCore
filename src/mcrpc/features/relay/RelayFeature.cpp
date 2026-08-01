@@ -2,11 +2,11 @@
 
 namespace mcrpc {
 
-void RelayFeature::registerCommands(Registry& registry) {
+void RelayFeature::registerCommands(CommandRegistry& commands) {
   (void)_host;
-  registry.registerCommand("relay", &RelayFeature::unsupported, "relay control", "relay");
-  registry.registerCommand("toggle", &RelayFeature::unsupported, "toggle relay", "relay");
-  registry.registerCommand("power", &RelayFeature::unsupported, "relay power", "relay");
+  commands.registerCommand("relay", &RelayFeature::unsupported, "relay control");
+  commands.registerCommand("toggle", &RelayFeature::unsupported, "toggle relay");
+  commands.registerCommand("power", &RelayFeature::unsupported, "relay power");
 }
 
 }  // namespace mcrpc
