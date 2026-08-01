@@ -2,9 +2,9 @@
 
 Long-term maintainable extension of [MeshCore](https://github.com/meshcore-dev/MeshCore).
 
-**mcRPC is a reusable Feature SDK / application framework**, not merely a list of commands. New device behaviour is added as Feature modules that depend only on a stable API (`FeatureSdk.h`). They never need to know how the parser, dispatcher, or registries work internally.
+**mcRPC is a standalone, transport-independent library** (`lib/mcrpc`) with a Feature SDK. MeshCore firmware is one consumer; desktop tools and the Home Assistant MeshCore integration will use the **same library** so parse/build behaviour stays identical across platforms.
 
-This repository is a clean checkout of upstream MeshCore on branch `mcrpc`. All mcRPC work is additive so upstream merges stay small.
+This repository is a clean checkout of upstream MeshCore on branch `mcrpc`. The library lives under `lib/mcrpc/`; MeshCore-specific transport code stays in `examples/mcrpc/`.
 
 ## Project goals
 
@@ -18,13 +18,19 @@ This repository is a clean checkout of upstream MeshCore on branch `mcrpc`. All 
 ## Architecture
 
 ```
-Radio
-  → MeshCore (Packet / Dispatcher / Mesh)
-    → McRpcMesh transport (InboundMessage)
-      → Parser → Dispatcher → CommandRegistry
-      → FeatureManager (Feature SDK lifecycle)
-      → EventBus → subscribers (mesh, future HA/log/display)
-      → Features + HostServices
+┌─────────────────────────────────────────────┐
+│  lib/mcrpc  (transport-independent)         │
+│  Parser · Registry · EventBus · Feature SDK │
+│  Status/Discover/Outbound builders          │
+└─────────────────────────────────────────────┘
+        ↑                    ↑
+ MeshCore consumer      Desktop / HA
+ examples/mcrpc/        CMake / bindings
+ (GRP_TXT transport)
+```
+
+```
+Radio → MeshCore → McRpcMesh → lib/mcrpc → Features → HostServices
 ```
 
 | Layer | Owns | Must not know |
@@ -90,15 +96,14 @@ pio run -e Heltec_v3_mcrpc_button
 pio run -e LW010_mcrpc_gps
 ```
 
-Host unit tests (parser / registry / dispatcher):
+Library / host tests:
 
 ```bash
-g++ -std=c++17 -I src -o /tmp/test_mcrpc \
-  test/mcrpc/test_mcrpc.cpp \
-  src/mcrpc/Parser.cpp src/mcrpc/Registry.cpp \
-  src/mcrpc/Dispatcher.cpp src/mcrpc/FeatureManager.cpp
-/tmp/test_mcrpc
+./scripts/test-mcrpc-host.sh          # g++ against lib/mcrpc
+./scripts/build-mcrpc-desktop.sh      # CMake + ctest
 ```
+
+See [lib/mcrpc/README.md](lib/mcrpc/README.md).
 
 ## Configuration
 
