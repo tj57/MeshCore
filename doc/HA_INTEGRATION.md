@@ -1,24 +1,75 @@
-# Home Assistant integration notes
+# Home Assistant integration architecture
 
-The MeshCore HA integration should depend on **`lib/mcrpc`**, not re-implement the grammar.
+MeshCore firmware is only a **transport consumer** of mcRPC. The Home Assistant
+integration lives in a separate repository and must remain transport-oriented.
 
-## Recommended usage
+**Canonical HA fork (branch `mcrpc`):**  
+https://github.com/tj57/meshcore-ha
 
-| Need | API |
-|------|-----|
-| Parse inbound channel text | `Parser::stripSenderPrefix` + `Parser::parse` → `Request` |
-| Build outbound commands | `OutboundBuilder::request` / `requestWithArgs` |
-| Parse/format events | look for `event ` prefix; `OutboundBuilder::event` |
-| Status / discover lines | `StatusBuilder` / `DiscoverBuilder` (or parse `key=value`) |
+**Protocol library:**  
+https://github.com/tj57/mcrpc (`python/` package + C++ reference)
 
-Do **not** require `McRpc` / FeatureManager / HostServices in HA unless you embed a full node simulator.
+Do **not** re-implement the mcRPC grammar inside Home Assistant. Depend on the
+standalone `mcrpc` Python package (same golden/compliance tests as C++).
 
-## Binding options (future)
+---
 
-1. Compile `libmcrpc.a` / `.so` via CMake; call from Python (`ctypes` / `cffi` / pybind11)
-2. Thin C API wrapper (`mcrpc_c.h`) for stable ABI
-3. Pure reimplementation only if bindings are blocked — must stay bit-compatible with host tests
+## Architecture
 
-## Compatibility guarantee
+```
+┌──────────────────────────────────────────────────┐
+│ Home Assistant                                   │
+│  meshcore integration (USB / BLE / TCP)          │
+│         │                                        │
+│         ▼                                        │
+│  meshcore.request / broadcast / raw              │
+│  McRpcBridge · Node Registry · events            │
+│         │ uses package: mcrpc (Python)           │
+│         ▼                                        │
+│  channel text send/receive (existing MeshCore)   │
+└──────────────────────────────────────────────────┘
+              ▲ text on mesh channel
+┌─────────────┴────────────────────────────────────┐
+│ Mesh device firmware (libmcrpc + Feature SDK)    │
+│ examples/mcrpc/ — GRP_TXT adapter only           │
+└──────────────────────────────────────────────────┘
+```
 
-Host tests in `test/mcrpc/` are the contract. HA CI should run `./scripts/build-mcrpc-desktop.sh` (or equivalent) against the same commit as firmware.
+HA is a **peer** on the channel. Prefer **not** embedding C++ `McRpc` /
+FeatureManager in HA.
+
+---
+
+## Public HA API (user-facing)
+
+| Service | Role |
+|---------|------|
+| `meshcore.request` | Normal node request (`wait` / `parse` / `response_variable`) |
+| `meshcore.broadcast` | All nodes → `responses[]` |
+| `meshcore.raw` | Advanced arbitrary text |
+| `meshcore.send_mcrpc` | Debug alias of `raw` |
+| `meshcore.list_nodes` | Node Registry cache |
+| `meshcore.has_capability` | Capability check |
+
+Events: `meshcore_response`, `meshcore_event` (protocol-agnostic names).
+
+Optional — disabled until **Configure → Global Settings → Enable mesh node requests**.
+
+Docs in the HA repo: `docs/MCRPC.md`, `docs/ARCHITECTURE_MCRPC.md`,
+`examples/automations/`.
+
+---
+
+## Compatibility
+
+- Existing MeshCore HA messaging/entities unchanged when node requests are off.
+- Firmware builds continue to consume mcRPC via PlatformIO (`symlink://` dev or
+  git tag release) — see `doc/MCRPC_DEPENDENCY.md`.
+- Protocol contract = `mcrpc` golden + compliance tests.
+
+---
+
+## Status
+
+Implemented in **tj57/meshcore-ha** (`mcrpc` branch). This MeshCore tree only
+documents the consumer relationship.
