@@ -46,7 +46,8 @@ void McRpcMesh::beginMcRpc(FILESYSTEM* fs) {
 #endif
   _rpc.config().prefs().feat_battery = 1;
 
-  _rpc.config().begin(fs);
+  _cfg_store.setFilesystem(fs);
+  _rpc.config().begin(&_cfg_store);
   // Prefer MeshCore node name from NodePrefs when set
   if (getNodeName() && getNodeName()[0]) {
     _rpc.config().setNodeName(getNodeName());

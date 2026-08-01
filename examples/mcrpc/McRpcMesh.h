@@ -9,7 +9,8 @@
 #include <mcrpc/features/battery/BatteryFeature.h>
 #include <mcrpc/features/button/ButtonFeature.h>
 #include <mcrpc/features/gps/GpsFeature.h>
-#include <mcrpc/drivers/OnDemandGps.h>
+#include "drivers/OnDemandGps.h"
+#include "ArduinoFsConfigStore.h"
 
 #ifndef MCRPC_MAX_TEXT
 #define MCRPC_MAX_TEXT (10 * 16)
@@ -68,6 +69,7 @@ protected:
 
 private:
   mcrpc::McRpc _rpc;
+  mcrpc::ArduinoFsConfigStore _cfg_store;
   mcrpc::CoreFeature _feat_core;
   mcrpc::BatteryFeature _feat_battery;
   mcrpc::ButtonFeature _feat_button;
