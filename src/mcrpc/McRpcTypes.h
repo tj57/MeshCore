@@ -63,8 +63,8 @@ struct Request {
 };
 
 struct ReplyBuffer {
-  char data[MCRPC_MAX_REPLY];
-  size_t len;
+  char data[MCRPC_MAX_REPLY] = {0};
+  size_t len = 0;
 
   void clear() {
     data[0] = 0;
