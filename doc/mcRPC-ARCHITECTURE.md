@@ -2,21 +2,21 @@
 
 ## Design decision
 
-mcRPC is an **additive Feature SDK** on MeshCore. BSP stays in upstream `variants/`. Application logic lives under `src/mcrpc/` + `examples/mcrpc/`.
+mcRPC is a **standalone library** (`lib/mcrpc`) consumed by MeshCore, desktop, and (later) Home Assistant. BSP stays in upstream `variants/`. Mesh transport adapters stay in `examples/mcrpc/`.
 
 ```
-src/mcrpc/
-  FeatureSdk.h              # umbrella for feature authors
-  Feature.h                 # stable Feature API + FeatureContext
-  CommandRegistry.*
-  CapabilityRegistry.*
-  EventBus.*
-  StatusBuilder.h / DiscoverBuilder.h
-  InboundMessage.h
-  Parser / Dispatcher / McRpc / FeatureManager / Config
+lib/mcrpc/src/mcrpc/        # transport-independent library
+  FeatureSdk.h
+  Parser / Dispatcher / CommandRegistry / CapabilityRegistry
+  EventBus / StatusBuilder / DiscoverBuilder / OutboundBuilder
+  InboundMessage / McRpc / FeatureManager / Config (+ ConfigStore)
   HostServices.h
-  drivers/OnDemandGps.h     # hardware helper (not a Feature)
   features/<name>/
+
+examples/mcrpc/             # MeshCore consumer only
+  McRpcMesh.*               # GRP_TXT ↔ InboundMessage
+  ArduinoFsConfigStore.h
+  drivers/OnDemandGps.h
 ```
 
 ## Layers
