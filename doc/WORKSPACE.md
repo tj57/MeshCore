@@ -2,14 +2,12 @@
 
 Canonical documentation: **`/data/projects/README.md`**.
 
-## Summary
-
 | Path | Role |
 |------|------|
 | `/data/projects/mcrpc` | Standalone library (only protocol implementation) |
-| `/data/projects/meshcore` | This repository — transport adapter in `examples/mcrpc` |
+| `/data/projects/meshcore` | This repository — adapter in `examples/mcrpc` |
 
-Dependency: `lib_deps = file://../mcrpc` (PlatformIO local path, no symlink).
+Dependency: `lib_extra_dirs = ..` + `lib_deps = mcrpc` (in-place sibling, no symlink, no vendored copy).
 
 ```
 Update mcRPC → run tests → build MeshCore → flash → repeat
