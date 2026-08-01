@@ -1,0 +1,28 @@
+name: mcRPC (via submodule/symlink)
+
+on:
+  push:
+    paths:
+      - 'lib/mcrpc/**'
+      - 'examples/mcrpc/**'
+      - 'scripts/*mcrpc*'
+      - '.github/workflows/mcrpc.yml'
+  pull_request:
+    paths:
+      - 'lib/mcrpc/**'
+      - 'examples/mcrpc/**'
+      - 'scripts/*mcrpc*'
+      - '.github/workflows/mcrpc.yml'
+  workflow_dispatch:
+
+jobs:
+  desktop:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install
+        run: sudo apt-get update && sudo apt-get install -y cmake g++ python3
+      - name: Run standalone suite
+        run: ./lib/mcrpc/scripts/test/run-all.sh

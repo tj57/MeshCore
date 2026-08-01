@@ -2,9 +2,11 @@
 
 Long-term maintainable extension of [MeshCore](https://github.com/meshcore-dev/MeshCore).
 
-**mcRPC is a standalone, transport-independent library** (`lib/mcrpc`) with a Feature SDK. MeshCore firmware is one consumer; desktop tools and the Home Assistant MeshCore integration will use the **same library** so parse/build behaviour stays identical across platforms.
+**mcRPC is a standalone open-source library** at `/data/projects/mcrpc`.  
+This MeshCore tree is one consumer (`examples/mcrpc`). PlatformIO links the
+sibling library with `lib_deps = file://../mcrpc` (no copied sources, no symlink).
 
-This repository is a clean checkout of upstream MeshCore on branch `mcrpc`. The library lives under `lib/mcrpc/`; MeshCore-specific transport code stays in `examples/mcrpc/`.
+Workspace overview: [`/data/projects/README.md`](/data/projects/README.md) · [`doc/WORKSPACE.md`](doc/WORKSPACE.md).
 
 ## Project goals
 
@@ -19,7 +21,7 @@ This repository is a clean checkout of upstream MeshCore on branch `mcrpc`. The 
 
 ```
 ┌─────────────────────────────────────────────┐
-│  lib/mcrpc  (transport-independent)         │
+│  /data/projects/mcrpc  (standalone library) │
 │  Parser · Registry · EventBus · Feature SDK │
 │  Status/Discover/Outbound builders          │
 └─────────────────────────────────────────────┘
@@ -30,7 +32,7 @@ This repository is a clean checkout of upstream MeshCore on branch `mcrpc`. The 
 ```
 
 ```
-Radio → MeshCore → McRpcMesh → lib/mcrpc → Features → HostServices
+Radio → MeshCore → McRpcMesh → mcrpc (file://../mcrpc) → Features → HostServices
 ```
 
 | Layer | Owns | Must not know |
@@ -56,10 +58,11 @@ button ping
 → button: pong
 
 all discover
-→ tracker profile=tracker fw=mcrpc-0.1.0
+→ tracker profile=tracker fw=mcrpc-1.0.0 protocol=1.0 sdk=1.0.0
 ```
 
-Full grammar and semantics: [doc/mcRPC-CORE.md](doc/mcRPC-CORE.md).
+Library docs: [lib/mcrpc/README.md](lib/mcrpc/README.md).  
+Full grammar: [doc/mcRPC-CORE.md](doc/mcRPC-CORE.md).
 
 ## Supported mcRPC targets
 

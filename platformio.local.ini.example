@@ -1,0 +1,7 @@
+; Optional machine overrides (gitignored if you copy this file).
+; Sibling layout under /data/projects does NOT require this file when
+; envs use: lib_deps = file://../mcrpc
+;
+; Alternative (finds libraries under parent dir):
+; [platformio]
+; lib_extra_dirs = ..
