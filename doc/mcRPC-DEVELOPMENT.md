@@ -33,9 +33,14 @@ If a conflict appears inside `src/Mesh.cpp` or `CommonCLI.cpp`, stop and re-eval
 
 ## Adding a feature (checklist)
 
-- [ ] `src/mcrpc/features/<name>/`
-- [ ] Register commands + capability string
+- [ ] `#include <mcrpc/FeatureSdk.h>` only (no Parser/Dispatcher)
+- [ ] `src/mcrpc/features/<name>/` subclassing `Feature`
+- [ ] `registerCommands` + `registerCapabilities`
+- [ ] Optional `contributeStatus` / `contributeDiscover`
+- [ ] Events via `publishEvent()` / EventBus
 - [ ] Extend `HostServices` only if new IO is required
+- [ ] Board drivers go under `src/mcrpc/drivers/` or the app — not in the feature
+- [ ] `features().add()` before `McRpc::begin()`
 - [ ] Gate with `MCRPC_ENABLE_<NAME>`
 - [ ] Docs: FEATURES.md + PROFILES.md
 - [ ] Host test for pure logic if any

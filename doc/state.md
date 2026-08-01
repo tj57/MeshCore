@@ -1,160 +1,84 @@
 # state.md — Living architecture status
 
 **Branch:** `mcrpc`  
-**Upstream base:** `meshcore-dev/MeshCore` @ `03b6ef4b` (2026-07-28)  
-**Last updated:** 2026-08-01
+**Upstream base:** `meshcore-dev/MeshCore` @ `03b6ef4b`  
+**Last updated:** 2026-08-01 (Feature SDK phase)
 
 ## Verdict
 
-mcRPC is implemented as an **additive application layer** on top of unchanged MeshCore. Upstream Heltec V3 sensor and RAK WisMesh Tag sensor builds succeed before changes. Both mcRPC targets (`Heltec_v3_mcrpc_button`, `LW010_mcrpc_gps`) build successfully after the refactor.
+mcRPC is now a **reusable Feature SDK / framework**, not a bag of ad-hoc commands. Future modules depend only on the stable Feature API (`FeatureSdk.h`); they never touch Parser, Dispatcher, or MeshCore packet types.
 
-## Current directory layout (mcRPC-relevant)
+## Why the SDK was introduced
 
-```
-src/mcrpc/                 # protocol + features (new)
-  Parser/Registry/Dispatcher/McRpc/Config/Feature*
-  features/{core,gps,battery,button}/
-  features/gps/OnDemandGps.h
-examples/mcrpc/            # SensorMesh transport + main
-doc/                       # mcRPC documentation
-test/mcrpc/                # host unit tests
-variants/heltec_v3/        # append-only mcRPC envs
-variants/rak_wismesh_tag/  # append-only mcRPC envs
-```
+Phase-1 features called `McRpc::publishEvent` and formatted `status`/`caps` strings by hand. That would force every new feature to learn internal objects and would freeze bad patterns. The SDK makes the framework assemble protocol responses and route events, so features stay small and replaceable for years.
 
-Upstream layout (`src/Mesh*`, `examples/simple_*`, `variants/*`) is preserved.
-
-## Current build system
-
-- PlatformIO root `platformio.ini` + `variants/*/platformio.ini`
-- mcRPC envs appended at end of variant files (merge-friendly)
-- Docker images with PIO caches used for CI-like builds on this host
-
-## Current command handling
+## Current architecture
 
 ```
-GRP_TXT on configured channel
-  → McRpcMesh::onGroupDataRecv
-    → McRpc::handleIncomingText
-      → Parser (strip "Sender: ")
-        → Dispatcher (addressing)
-          → Registry.find(command)
-            → Feature handler
-              → PublishFn → sendChannelText (flood)
+Transport (McRpcMesh / MeshCore GRP_TXT)
+    ↓ InboundMessage (text only)
+Parser → CommandObject/Request
+    ↓
+Dispatcher → CommandRegistry → handler
+    ↑
+FeatureManager lifecycle
+    setup → registerCommands → registerCapabilities → loop → shutdown
+    ↓
+Features (Feature SDK only)
+    ↓ EventBus.publish
+Subscribers (McRpc → mesh publish; future: HA, log, display…)
 ```
 
-Admin serial CLI still goes through SensorMesh / CommonCLI (unchanged).
+| Component | Role |
+|-----------|------|
+| `Feature` / `FeatureContext` | Stable SDK |
+| `CommandRegistry` | Command → handler (no capabilities) |
+| `CapabilityRegistry` | `caps` source of truth |
+| `EventBus` | Decoupled async events |
+| `StatusBuilder` / `DiscoverBuilder` | Assembled protocol lines |
+| `InboundMessage` | Transport-agnostic input |
+| `HostServices` | Hardware abstract IO |
+| `drivers/OnDemandGps` | Host/driver — not a Feature |
 
-## MeshCore architecture (reused)
+## Feature lifecycle
 
-| Piece | Role |
-|-------|------|
-| `Dispatcher` | Radio schedule, CAD, TX queue |
-| `Mesh` | Payload dispatch, flood/direct |
-| `GroupChannel` | `hash[1]` + `secret[32]` |
-| `createGroupDatagram` | Encrypt + MAC group text |
-| `searchChannelsByHash` | Decrypt candidates (collision-aware) |
-| `SensorMesh` | Sensor role + NodePrefs + CommonCLI |
-| `EnvironmentSensorManager` | GPS via `setSettingValue("gps",…)` |
+Owned **only** by `FeatureManager`:
 
-### Private channels / passwords
+1. `add(feature)` before start  
+2. `start` → `setup` → `registerCommands` → `registerCapabilities`  
+3. `loop`  
+4. `stop` → `shutdown` (reverse order)
 
-- **Group PSK:** shared secret; hash = SHA256(secret)[0]; no join protocol
-- **Admin password:** `NodePrefs` / ACL — orthogonal to mcRPC channel PSK
-- mcRPC listens only on the channel configured in `/mcrpc_cfg`
-- Home Assistant: run a companion/bridge that joins the same channel and maps mcRPC text ↔ entities (out of band; not in this firmware)
+Features must not register commands outside `registerCommands()`.
 
-## Configuration system
+## Remaining weaknesses
 
-| File | Owner | Notes |
-|------|-------|-------|
-| `/com_prefs` | CommonCLI / SensorMesh | Do not fork layout |
-| `/mcrpc_cfg` | `mcrpc::Config` | mcRPC-only prefs |
-| `/identity` | IdentityStore | Unchanged |
+- Static `g_*` pointers inside feature command handlers (multi-instance still limited)
+- CoreFeature reaches `McRpc` via `HostServices::engine` for builders (acceptable, but a narrower `FrameworkServices` iface would be cleaner)
+- Relay/display/LED stubs still `err unsupported`
+- No multi-channel listen
+- Default PSKs are demo secrets
 
-## Board abstraction
+## Future extension model
 
-Unchanged: `MainBoard` + `variants/<board>/target.cpp`. Features talk to `HostServices`, implemented by `McRpcMesh`.
+1. `#include <mcrpc/FeatureSdk.h>`  
+2. Subclass `Feature`, implement the virtuals  
+3. Use `HostServices` for IO; `publishEvent()` for async  
+4. `features().add(&myFeature)` in the app before `McRpc::begin()`  
+5. Never include Parser/Dispatcher/Mesh headers in the feature
 
-## Feature abstraction
+## Private channels
 
-`Feature` → `registerCommands(Registry&)` + optional `loop()`. Feature Manager owns lifecycle.
+See [PRIVATE_CHANNELS.md](PRIVATE_CHANNELS.md) — native MeshCore group crypto only.
 
-## Extension points
-
-1. New feature under `src/mcrpc/features/`
-2. New board env appended to variant `platformio.ini`
-3. `HostServices` virtuals for new hardware capabilities
-4. `PublishFn` for alternate transports (serial, BLE) later
-
-## Code duplication (upstream debt — not ours to fix yet)
-
-- `simple_repeater` / `room_server` / `SensorMesh` CLI paths
-- Companion `MyMesh.cpp` monolith
-- Variant env copy-paste
-
-mcRPC deliberately does **not** copy those patterns into new switch trees.
-
-## Merge conflict risk areas
-
-| Area | Risk | Mitigation |
-|------|------|------------|
-| `src/Mesh.cpp` | High | Never touch |
-| `CommonCLI` prefs | High | Never touch layout |
-| Mid-file variant envs | Medium | Append-only blocks |
-| `examples/simple_sensor/*` | Medium | Compile against, don't fork |
-
-## Strengths
-
-- Clear layering; parser is host-testable without Arduino
-- Registry-based commands
-- Upstream builds remain valid
-- Both required targets compile
-
-## Weaknesses / technical debt
-
-- Feature static `g_*` singletons (simple, but limits multi-instance)
-- Reply framing uses MeshCore `name: body` prefix; request-id appears inside body (`#42 pong`) rather than `name#42` at mesh layer — documented; protocol-compatible for HA parsers that strip sender prefix
-- Relay/display/LED/OTA features not implemented (stubs pending)
-- No on-device integration tests; host tests cover parser/dispatcher only
-- Default channel PSKs are public demo secrets — must change in field
-- `rssi` in status uses radio last RSSI (may be stale)
-- GPS sats/hdop completeness depends on LocationProvider
-
-## Recommended refactoring (next)
-
-1. Replace static feature pointers with `CommandContext::user` carrying a small service locator
-2. Add `RelayFeature` / `DisplayFeature` / `LedFeature`
-3. Optional serial transport for mcRPC (not only group channel)
-4. Documented HA MQTT gateway example
-5. PlatformIO `native` env for tests in CI
-
-## Estimated effort
-
-| Item | Effort |
-|------|--------|
-| Done (core + 2 boards) | ~3–5 eng-days |
-| Remaining feature stubs + HA bridge | 1–2 weeks |
-| Multi-channel listen + ACL | 1 week |
-| Upstream contribution of SensorMesh hooks | TBD (social/process) |
-
-## Open questions
-
-1. Should responses omit the MeshCore `Sender:` prefix and emit bare mcRPC lines? (Would need companion UX check.)
-2. Multi-channel listen — one registry, many PSKs?
-3. Track `origin/main` vs `origin/dev` as permanent upstream?
-4. Publish request-id as `name#id` by rewriting the MeshCore sender prefix?
-
-## Build verification log
+## Build verification
 
 | Target | Result |
 |--------|--------|
-| `Heltec_v3_sensor` (upstream) | SUCCESS |
-| `RAK_WisMesh_Tag_sensor` (upstream) | SUCCESS |
-| `Heltec_v3_mcrpc_button` | SUCCESS (Flash ~17%, RAM ~10%) |
-| `LW010_mcrpc_gps` | SUCCESS (Flash ~54%, RAM ~12%) |
-| Host `test/mcrpc` | ALL TESTS PASSED |
+| Host tests | ALL PASSED (108 assertions) |
+| `Heltec_v3_mcrpc_button` | SUCCESS |
+| `LW010_mcrpc_gps` | SUCCESS |
 
-## Warnings
+## Suitability as long-term base
 
-No compiler warnings were treated as errors. PIO builds use upstream `-w` on `arduino_base`. Host tests compiled with `-Wall -Wextra` cleanly.
+**Yes** — with the additive layout + Feature SDK, this is suitable as the long-term base for MeshCore application extensions, provided the policy holds: no edits to MeshCore core, features only via SDK, append-only board envs.
