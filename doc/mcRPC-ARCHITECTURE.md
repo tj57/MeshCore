@@ -1,85 +1,129 @@
 # mcRPC Architecture
 
-## Design decision (vs proposed tree)
+## Design decision
 
-The suggested top-level `src/config`, `src/hardware/lw010`, … would fight PlatformIO’s existing `variants/` + `helpers/` layout and create permanent merge friction.
-
-**Chosen layout (5-year maintainer view):**
+mcRPC is an **additive Feature SDK** on MeshCore. BSP stays in upstream `variants/`. Application logic lives under `src/mcrpc/` + `examples/mcrpc/`.
 
 ```
-src/mcrpc/                 # all mcRPC code (additive filter)
-  config → Config.*
-  feature_manager → FeatureManager.*
+src/mcrpc/
+  FeatureSdk.h              # umbrella for feature authors
+  Feature.h                 # stable Feature API + FeatureContext
+  CommandRegistry.*
+  CapabilityRegistry.*
+  EventBus.*
+  StatusBuilder.h / DiscoverBuilder.h
+  InboundMessage.h
+  Parser / Dispatcher / McRpc / FeatureManager / Config
+  HostServices.h
+  drivers/OnDemandGps.h     # hardware helper (not a Feature)
   features/<name>/
-  Parser / Dispatcher / Registry / McRpc
-examples/mcrpc/            # thin SensorMesh transport
-variants/<board>/          # append-only [env:*_mcrpc_*]
 ```
-
-Hardware BSP stays in upstream `variants/`. Features never include board headers.
 
 ## Layers
 
 ```
-┌─────────────────────────────────────────┐
-│ Features (gps, button, battery, core…)  │
-├─────────────────────────────────────────┤
-│ Registry  ←  Dispatcher  ←  Parser      │
-├─────────────────────────────────────────┤
-│ McRpc facade + Config + FeatureManager  │
-├─────────────────────────────────────────┤
-│ HostServices (implemented by McRpcMesh) │
-├─────────────────────────────────────────┤
-│ MeshCore SensorMesh / GroupChannel TXRX │
-├─────────────────────────────────────────┤
-│ Radio / MainBoard (variants/)           │
-└─────────────────────────────────────────┘
+┌──────────────────────────────────────────────┐
+│ Features  (Feature SDK only)                 │
+├──────────────────────────────────────────────┤
+│ CommandRegistry ← Dispatcher ← Parser        │
+│ CapabilityRegistry / Status / Discover       │
+│ EventBus                                     │
+├──────────────────────────────────────────────┤
+│ McRpc facade + FeatureManager + Config       │
+├──────────────────────────────────────────────┤
+│ HostServices (app/board callbacks)           │
+├──────────────────────────────────────────────┤
+│ McRpcMesh transport (SensorMesh + GRP_TXT)   │
+├──────────────────────────────────────────────┤
+│ Radio / MainBoard (variants/)                │
+└──────────────────────────────────────────────┘
 ```
 
 ### Invariants
 
-1. Parser never includes Arduino, RadioLib, or board headers
-2. Features never parse MeshCore packets
-3. Business logic never lives in the parser
-4. Adding a command = one `registerCommand` call
+1. Parser never includes Arduino, RadioLib, MeshCore Packet, or board headers  
+2. Features never parse MeshCore packets  
+3. Dispatcher never knows Feature types — only CommandRegistry  
+4. Adding a command = `registerCommand()` inside `registerCommands()`  
+5. Capabilities come only from CapabilityRegistry  
 
-## Packet flow
+## Feature lifecycle
 
-**Inbound**
-
-1. Radio RX → Dispatcher → Mesh decrypts GRP_TXT via `searchChannelsByHash`
-2. `McRpcMesh::onGroupDataRecv` extracts plain text after timestamp/type bytes
-3. `McRpc::handleIncomingText` strips optional `Sender: ` prefix
-4. Parser → addressing check → Registry → handler → ReplyBuffer
-5. `PublishFn` → `sendChannelText` → `createGroupDatagram` → `sendFlood`
-
-**Outbound events**
-
-`McRpc::publishEvent("button_pressed", "count=3")` → same publish path, no request id.
-
-## Command registration
-
-```cpp
-registry.registerCommand("ping", &CoreFeature::cmdPing, "connectivity test", nullptr);
-registry.registerCommand("gps", &GpsFeature::cmdGps, "get GPS fix", "gps");
+```
+construct → FeatureManager::add
+         → start:
+              setup(FeatureContext)
+              registerCommands(CommandRegistry)
+              registerCapabilities(CapabilityRegistry)
+         → loop*
+         → stop: shutdown (reverse order)
 ```
 
-Capability strings feed `caps`. Core commands omit capability (not listed).
+`FeatureContext` provides `commands`, `capabilities`, `events`, `manager`.
 
-## Configuration model
+Features publish with `publishEvent(name, kv)` → EventBus → subscribers.
 
-- **Radio / node identity / admin password:** MeshCore `NodePrefs` (`/com_prefs`)
-- **mcRPC channel + profile + feature flags:** `mcrpc::Config` (`/mcrpc_cfg`)
-- Channel secret: 16 ASCII bytes by default; hash via `mesh::Utils::sha256` — same as `BaseChatMesh::addChannel`
+## Packet lifecycle
 
-## Why SensorMesh?
+```
+Raw radio bytes
+  → MeshCore decrypt GRP_TXT (native channel hash + PSK)
+  → "Sender: <mcRPC line>" text
+  → InboundMessage { text, optional rssi }
+  → Parser::stripSenderPrefix
+  → Parser::parse → Request
+  → Dispatcher (addressing) → CommandRegistry → handler
+  → ReplyBuffer → PublishFn → createGroupDatagram → flood
+```
 
-Repeaters/room servers do not store group channels. Sensor role already has telemetry, battery hooks, and CommonCLI. Extending SensorMesh for transport reuses the most appropriate upstream role without inventing a parallel mesh stack.
+Parser is host-testable without MeshCore (`test/mcrpc`).
 
-## Home Assistant integration sketch
+## Event lifecycle
 
-1. Phone/companion or ESP gateway joins `#mych` with the shared PSK
-2. Gateway publishes received mcRPC lines to MQTT
-3. HA automations map `event button_pressed` → entities; `tracker gps` → device_tracker
+```
+Feature::publishEvent("button_pressed", "count=3")
+  → EventBus::publish
+  → each subscriber
+       default: McRpc formats "event button_pressed count=3" → mesh
+       future: HA bridge, logger, display, BLE, storage
+```
 
-Firmware does not embed MQTT — keeps flash small and transport-independent (protocol requirement).
+Features never know who consumes events.
+
+## Capability registration
+
+```
+Feature::registerCapabilities(caps)
+  caps.registerCapability("gps");
+```
+
+`caps` command → `CapabilityRegistry::writeTo` (one name per line). No hardcoded lists.
+
+## Status / discover generation
+
+```
+status:
+  McRpc::buildStatus
+    + identity fields (name, profile, fw, uptime, rssi)
+    + FeatureManager::collectStatus → each Feature::contributeStatus
+  → StatusBuilder::writeTo → "status key=value ..."
+
+discover:
+  McRpc::buildDiscover
+    + name + profile + fw
+    + Feature::contributeDiscover
+  → "name profile=… fw=… gps=yes battery=yes ..."
+```
+
+## Configuration
+
+| Store | Role |
+|-------|------|
+| `/com_prefs` | MeshCore NodePrefs (radio, admin) |
+| `/mcrpc_cfg` | mcRPC profile, channel, PSK, feature flags |
+
+Build macros seed defaults once; filesystem wins afterward. See [PRIVATE_CHANNELS.md](PRIVATE_CHANNELS.md).
+
+## Board independence
+
+Features use `HostServices` only. GPS power sessions live in `drivers/OnDemandGps` (host wiring in `McRpcMesh`), not inside `GpsFeature`. No `#ifdef BOARD_*` in feature sources.

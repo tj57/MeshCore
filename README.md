@@ -1,6 +1,8 @@
 # MeshCore + mcRPC
 
-Long-term maintainable extension of [MeshCore](https://github.com/meshcore-dev/MeshCore) that adds **mcRPC** — a human-readable application protocol for Home Assistant, CLI tools, and embedded nodes.
+Long-term maintainable extension of [MeshCore](https://github.com/meshcore-dev/MeshCore).
+
+**mcRPC is a reusable Feature SDK / application framework**, not merely a list of commands. New device behaviour is added as Feature modules that depend only on a stable API (`FeatureSdk.h`). They never need to know how the parser, dispatcher, or registries work internally.
 
 This repository is a clean checkout of upstream MeshCore on branch `mcrpc`. All mcRPC work is additive so upstream merges stay small.
 
@@ -9,7 +11,8 @@ This repository is a clean checkout of upstream MeshCore on branch `mcrpc`. All 
 - Keep MeshCore radio/routing/crypto untouched
 - Speak a stable text protocol over private group channels
 - Organize firmware around **features**, not boards
-- Register commands — never grow giant `switch` / `if (cmd == …)` trees
+- Stable Feature SDK: `setup` / `registerCommands` / `registerCapabilities` / `loop` / `shutdown`
+- EventBus, CapabilityRegistry, Status/Discover builders assemble protocol responses
 - Remain easy to sync with upstream for the next five years
 
 ## Architecture
@@ -17,22 +20,23 @@ This repository is a clean checkout of upstream MeshCore on branch `mcrpc`. All 
 ```
 Radio
   → MeshCore (Packet / Dispatcher / Mesh)
-    → Configuration (NodePrefs + /mcrpc_cfg)
-      → Feature Manager
-        → mcRPC (Parser → Dispatcher → Registry)
-          → Features (gps, button, battery, …)
-            → HostServices (board callbacks)
+    → McRpcMesh transport (InboundMessage)
+      → Parser → Dispatcher → CommandRegistry
+      → FeatureManager (Feature SDK lifecycle)
+      → EventBus → subscribers (mesh, future HA/log/display)
+      → Features + HostServices
 ```
 
 | Layer | Owns | Must not know |
 |-------|------|----------------|
 | Parser | Grammar only | Hardware, MeshCore |
-| Registry | Command → handler | Pins, radios |
-| Features | Commands + events | Packet wire format |
+| CommandRegistry | Command → handler | Features, pins |
+| CapabilityRegistry | `caps` list | Commands |
+| EventBus | Pub/sub events | Mesh framing |
+| Features | Commands + contributions | Packet wire format |
 | HostServices | Battery/GPS/button IO | Protocol grammar |
-| McRpcMesh | Group-channel transport | Feature internals |
 
-See [doc/mcRPC-ARCHITECTURE.md](doc/mcRPC-ARCHITECTURE.md).
+See [doc/mcRPC-ARCHITECTURE.md](doc/mcRPC-ARCHITECTURE.md) and [doc/PRIVATE_CHANNELS.md](doc/PRIVATE_CHANNELS.md).
 
 ## mcRPC
 
@@ -111,11 +115,13 @@ Change defaults via build flags `MCRPC_DEFAULT_*` or persist new values in `/mcr
 
 ## Adding a new feature
 
-1. Create `src/mcrpc/features/<name>/`
-2. Subclass `mcrpc::Feature`, implement `registerCommands()`
-3. Use `HostServices` for hardware — never parse packets in the feature
-4. Add the feature in `McRpcMesh::beginMcRpc()` behind a `MCRPC_ENABLE_*` flag
-5. Document it in [doc/FEATURES.md](doc/FEATURES.md)
+1. `#include <mcrpc/FeatureSdk.h>`
+2. Create `src/mcrpc/features/<name>/` and subclass `mcrpc::Feature`
+3. Implement `registerCommands`, `registerCapabilities`, optional `contributeStatus` / `contributeDiscover`
+4. Publish async notifications with `publishEvent()` (EventBus) — do not call MeshCore
+5. Use `HostServices` for hardware — never parse packets; no board `#ifdef` in the feature
+6. `features().add(&myFeature)` in the app **before** `McRpc::begin()`
+7. Document it in [doc/FEATURES.md](doc/FEATURES.md)
 
 ## Adding a new board
 
@@ -156,7 +162,8 @@ Near term: relay/display/LED features, Home Assistant MQTT bridge notes, deeper 
 |-----|---------|
 | [doc/state.md](doc/state.md) | Living architecture analysis |
 | [doc/mcRPC-CORE.md](doc/mcRPC-CORE.md) | Protocol specification |
-| [doc/mcRPC-ARCHITECTURE.md](doc/mcRPC-ARCHITECTURE.md) | Layer design |
+| [doc/mcRPC-ARCHITECTURE.md](doc/mcRPC-ARCHITECTURE.md) | SDK, lifecycles, builders |
+| [doc/PRIVATE_CHANNELS.md](doc/PRIVATE_CHANNELS.md) | Native MeshCore channel/PSK |
 | [doc/mcRPC-PROFILES.md](doc/mcRPC-PROFILES.md) | Device profiles |
 | [doc/mcRPC-DEVELOPMENT.md](doc/mcRPC-DEVELOPMENT.md) | Contributor guide |
 | [doc/FEATURES.md](doc/FEATURES.md) | Feature catalog |
