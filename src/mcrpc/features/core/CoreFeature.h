@@ -5,15 +5,15 @@
 
 namespace mcrpc {
 
-/** Mandatory commands: ping, status, discover, help, caps */
+/** Mandatory commands — assembled via Status/Discover/Capability builders. */
 class CoreFeature : public Feature {
 public:
   explicit CoreFeature(HostServices& host) : _host(host) {}
 
   const char* name() const override { return "core"; }
-  const char* capability() const override { return nullptr; }  // not listed in caps
 
-  void registerCommands(Registry& registry) override;
+  void registerCommands(CommandRegistry& commands) override;
+  // core is not listed in caps
 
 private:
   HostServices& _host;

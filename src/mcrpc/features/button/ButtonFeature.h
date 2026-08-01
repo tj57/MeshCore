@@ -2,13 +2,12 @@
 
 #include "../../Feature.h"
 #include "../../HostServices.h"
-#include "../../McRpc.h"
 
 namespace mcrpc {
 
 /**
- * Button feature — registers commands; physical edge detection lives in the
- * board/app (MomentaryButton) and calls notifyPressed().
+ * Button feature — board edge detection stays in the host (MomentaryButton).
+ * Call notifyPressed() from the app; feature publishes via EventBus.
  */
 class ButtonFeature : public Feature {
 public:
@@ -16,11 +15,12 @@ public:
 
   const char* name() const override { return "button"; }
 
-  void registerCommands(Registry& registry) override;
+  void registerCommands(CommandRegistry& commands) override;
+  void registerCapabilities(CapabilityRegistry& caps) override;
+  void contributeStatus(StatusBuilder& status) override;
+  void contributeDiscover(DiscoverBuilder& discover) override;
 
-  /** Called by app when MomentaryButton reports a click. */
   void notifyPressed();
-
   bool lastState() const { return _pressed; }
 
 private:

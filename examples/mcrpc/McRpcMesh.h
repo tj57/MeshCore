@@ -9,7 +9,7 @@
 #include <mcrpc/features/battery/BatteryFeature.h>
 #include <mcrpc/features/button/ButtonFeature.h>
 #include <mcrpc/features/gps/GpsFeature.h>
-#include <mcrpc/features/gps/OnDemandGps.h>
+#include <mcrpc/drivers/OnDemandGps.h>
 
 #ifndef MCRPC_MAX_TEXT
 #define MCRPC_MAX_TEXT (10 * 16)
@@ -82,4 +82,6 @@ private:
   static bool publishThunk(const char* text, void* ctx);
   static void gpsDoneThunk(bool ok, float lat, float lon, float alt, int sats, float hdop,
                            void* ctx);
+  static uint32_t uptimeThunk(void* ctx);
+  static int rssiThunk(void* ctx);
 };

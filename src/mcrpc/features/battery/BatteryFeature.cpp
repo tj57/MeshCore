@@ -6,11 +6,27 @@ namespace mcrpc {
 
 static BatteryFeature* g_batt = nullptr;
 
-void BatteryFeature::registerCommands(Registry& registry) {
+void BatteryFeature::registerCommands(CommandRegistry& commands) {
   g_batt = this;
-  registry.registerCommand("battery", &BatteryFeature::cmdBattery, "battery percent", "battery");
-  registry.registerCommand("voltage", &BatteryFeature::cmdVoltage, "battery voltage", "battery");
-  registry.registerCommand("charging", &BatteryFeature::cmdCharging, "charging state", "battery");
+  commands.registerCommand("battery", &BatteryFeature::cmdBattery, "battery percent");
+  commands.registerCommand("voltage", &BatteryFeature::cmdVoltage, "battery voltage");
+  commands.registerCommand("charging", &BatteryFeature::cmdCharging, "charging state");
+}
+
+void BatteryFeature::registerCapabilities(CapabilityRegistry& caps) {
+  caps.registerCapability("battery");
+}
+
+void BatteryFeature::contributeStatus(StatusBuilder& status) {
+  float v = 0;
+  int pct = -1;
+  if (!_host.readBattery(v, pct)) return;
+  status.add("voltage", v);
+  if (pct >= 0) status.add("battery", pct);
+}
+
+void BatteryFeature::contributeDiscover(DiscoverBuilder& discover) {
+  discover.add("battery", "yes");
 }
 
 void BatteryFeature::loop() {
@@ -18,10 +34,10 @@ void BatteryFeature::loop() {
   int pct = -1;
   if (!_host.readBattery(v, pct)) return;
   if (v > 0 && v < _low_v) {
-    if (!_low_latched && _host.engine) {
+    if (!_low_latched) {
       char kv[32];
       snprintf(kv, sizeof(kv), "voltage=%.2f", (double)v);
-      _host.engine->publishEvent("battery_low", kv);
+      publishEvent("battery_low", kv);
       _low_latched = true;
     }
   } else if (v >= _low_v + 0.1f) {

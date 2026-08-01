@@ -4,11 +4,11 @@ namespace mcrpc {
 
 static DisplayFeature* g_disp = nullptr;
 
-void DisplayFeature::registerCommands(Registry& registry) {
+void DisplayFeature::registerCommands(CommandRegistry& commands) {
   g_disp = this;
-  registry.registerCommand("display", &DisplayFeature::cmdDisplay, "display status", "display");
-  registry.registerCommand("text", &DisplayFeature::cmdText, "show text", "display");
-  registry.registerCommand("clear", &DisplayFeature::cmdClear, "clear display", "display");
+  commands.registerCommand("display", &DisplayFeature::cmdDisplay, "display status");
+  commands.registerCommand("text", &DisplayFeature::cmdText, "show text");
+  commands.registerCommand("clear", &DisplayFeature::cmdClear, "clear display");
 }
 
 bool DisplayFeature::cmdDisplay(CommandContext& ctx) {
@@ -23,7 +23,6 @@ bool DisplayFeature::cmdText(CommandContext& ctx) {
     ctx.reply->append("err invalid_argument");
     return true;
   }
-  // Join args into one string (simple: first token only for v1)
   bool ok = g_disp->_host.displayText(ctx.request->args[0]);
   ctx.reply->clear();
   ctx.reply->append(ok ? "ok" : "err unsupported");

@@ -55,9 +55,13 @@ void McRpcMesh::beginMcRpc(FILESYSTEM* fs) {
   rebuildChannel();
 
   _rpc.setPublishHandler(&McRpcMesh::publishThunk, this);
+  _rpc.setFirmwareVersion(MCRPC_FW_VERSION);
+  _rpc.setProfile(_rpc.config().profile());
   _rpc.setNodeIdentity(_rpc.config().nodeName(), _rpc.config().channelName());
+  _rpc.setIdentityCallbacks(&McRpcMesh::uptimeThunk, &McRpcMesh::rssiThunk, this);
   _rpc.setUserData(this);
 
+  // FeatureManager owns lifecycle — features must not register outside add()+begin().
   _rpc.features().add(&_feat_core);
   _rpc.features().add(&_feat_battery);
 #ifdef MCRPC_ENABLE_BUTTON
@@ -135,6 +139,7 @@ void McRpcMesh::gpsDoneThunk(bool ok, float lat, float lon, float alt, int sats,
   char buf[128];
   if (!ok) {
     self->_rpc.publishRaw("err gps_no_fix");
+    self->_rpc.events().publish("gps_nofix", nullptr);
     return;
   }
   snprintf(buf, sizeof(buf), "gps lat=%.6f lon=%.6f alt=%.1f sat=%d", (double)lat, (double)lon,
@@ -145,7 +150,15 @@ void McRpcMesh::gpsDoneThunk(bool ok, float lat, float lon, float alt, int sats,
     strncat(buf, extra, sizeof(buf) - strlen(buf) - 1);
   }
   self->_rpc.publishRaw(buf);
-  self->_rpc.publishEvent("gps_fix", nullptr);
+  self->_rpc.events().publish("gps_fix", nullptr);
+}
+
+uint32_t McRpcMesh::uptimeThunk(void* ctx) {
+  return static_cast<McRpcMesh*>(ctx)->uptimeSeconds();
+}
+
+int McRpcMesh::rssiThunk(void* ctx) {
+  return static_cast<McRpcMesh*>(ctx)->rssi();
 }
 
 const char* McRpcMesh::nodeName() {
