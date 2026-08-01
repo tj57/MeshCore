@@ -341,12 +341,28 @@ all discover
 ↓
 
 ```
-ha profile=gateway fw=2026.8
+ha profile=gateway fw=2026.8 protocol=1.0 sdk=1.0.0
 
-tracker profile=tracker fw=1.2
+tracker profile=tracker fw=1.2 protocol=1.0 sdk=1.0.0
 
-relay1 profile=relay fw=1.0
+relay1 profile=relay fw=1.0 protocol=1.0 sdk=1.0.0
 ```
+
+Required fields (after node name):
+
+```
+profile=
+fw=
+protocol=
+sdk=
+```
+
+| Field | Meaning |
+|-------|---------|
+| `protocol` | Wire protocol version (`major.minor`), e.g. `1.0` |
+| `sdk` | Library/SDK version (semver), e.g. `1.0.0` |
+
+Clients MUST ignore unknown discover fields (forward compatible).
 
 ---
 
@@ -496,7 +512,15 @@ Applications MUST NOT redefine these.
 
 # 18. Forward Compatibility
 
-Unknown commands
+Unknown **commands** (no handler registered)
+
+↓
+
+```
+err unknown_command
+```
+
+Known command / capability that is not available on this device
 
 ↓
 
@@ -504,7 +528,7 @@ Unknown commands
 err unsupported
 ```
 
-Unknown fields
+Unknown fields in status/discover/events
 
 ↓
 
@@ -693,6 +717,6 @@ Documented for discussion — **not silently applied**:
 |------|---------|------|--------|
 | Emit bare mcRPC without MeshCore `Sender:` prefix | Cleaner lines | Breaks chat UX in companion apps | deferred |
 | Multi-channel listen list | Gateways | More flash + config | deferred |
-| `err unsupported` vs `unknown_command` nuance for aliases | Spec clarity | Minor | open |
+| `err unsupported` vs `unknown_command` | Spec clarified in §15/§18; dispatcher uses `unknown_command` | — | closed |
 | Binary TLV companion codec | Efficiency | Violates "human readable" goal | rejected |
 
