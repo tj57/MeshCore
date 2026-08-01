@@ -1,14 +1,13 @@
 # Workspace layout (MeshCore ↔ mcRPC)
 
-Canonical documentation: **`/data/projects/README.md`**.
+Canonical: **`/data/projects/README.md`**.
 
 | Path | Role |
 |------|------|
-| `/data/projects/mcrpc` | Standalone library (only protocol implementation) |
-| `/data/projects/meshcore` | This repository — adapter in `examples/mcrpc` |
+| `/data/projects/mcrpc` | Library |
+| `/data/projects/meshcore` | This repo — `examples/mcrpc` adapter |
 
-Dependency: `lib_deps = symlink://../mcrpc` (PlatformIO local URI → in-place sibling).
+**Dev:** `platformio.local.ini` → `symlink://../mcrpc`  
+**Release:** committed `[mcrpc_lib]` GitHub pin  
 
-```
-Update mcRPC → run tests → build MeshCore → flash → repeat
-```
+See `doc/MCRPC_DEPENDENCY.md`.

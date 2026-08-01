@@ -3,10 +3,13 @@
 Long-term maintainable extension of [MeshCore](https://github.com/meshcore-dev/MeshCore).
 
 **mcRPC is a standalone open-source library** at `/data/projects/mcrpc`.  
-This MeshCore tree is one consumer (`examples/mcrpc`). PlatformIO links the
-sibling library with `lib_deps = symlink://../mcrpc` (in-place; no vendored copy).
+This MeshCore tree is one consumer (`examples/mcrpc`).
 
-Workspace overview: [`/data/projects/README.md`](/data/projects/README.md) · [`doc/WORKSPACE.md`](doc/WORKSPACE.md).
+- **Development:** `platformio.local.ini` → `symlink://../mcrpc`
+- **Release / CI:** committed `[mcrpc_lib]` GitHub pin (never commit the local override)
+
+Workspace: [`/data/projects/README.md`](/data/projects/README.md) ·
+[`doc/MCRPC_DEPENDENCY.md`](doc/MCRPC_DEPENDENCY.md) · [`doc/WORKSPACE.md`](doc/WORKSPACE.md).
 
 ## Project goals
 
