@@ -53,7 +53,11 @@ FeatureManager in HA.
 
 Events: `meshcore_response`, `meshcore_event` (protocol-agnostic names).
 
-Optional — disabled until **Configure → Global Settings → Enable mesh node requests**.
+Optional — disabled until **Configure → Mesh Node Requests (mcRPC)**.
+
+That section configures listening channels, accepted addressing, allowed senders,
+reply identity, and diagnostics. Secure defaults: no answer on Public, bare
+commands off. See HA `docs/MCRPC.md` (Configuration / Security / Migration).
 
 Docs in the HA repo: `docs/MCRPC.md`, `docs/ARCHITECTURE_MCRPC.md`,
 `examples/automations/`.
