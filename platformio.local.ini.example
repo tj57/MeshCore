@@ -1,7 +1,16 @@
-; Optional machine overrides (gitignored if you copy this file).
-; Sibling layout under /data/projects does NOT require this file when
-; envs use: lib_deps = file://../mcrpc
+; =============================================================================
+; Local development override (copy to platformio.local.ini — gitignored).
 ;
-; Alternative (finds libraries under parent dir):
-; [platformio]
-; lib_extra_dirs = ..
+; RELEASE builds use the committed [mcrpc_lib] in platformio.ini
+;   (GitHub tag, later PlatformIO Registry).
+;
+; DEVELOPMENT: use the sibling checkout under /data/projects/mcrpc
+; =============================================================================
+
+[mcrpc_lib]
+lib = symlink://../mcrpc
+
+; Optional alternatives:
+; lib = file://../mcrpc
+; lib = https://github.com/tj57/mcrpc.git#v1.0.0
+; lib = mcrpc @ ^1.0.0          ; after registry publish

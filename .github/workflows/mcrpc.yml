@@ -1,28 +1,34 @@
-name: mcRPC (via submodule/symlink)
+name: mcRPC consumer check
 
 on:
   push:
     paths:
-      - 'lib/mcrpc/**'
       - 'examples/mcrpc/**'
-      - 'scripts/*mcrpc*'
+      - 'variants/heltec_v3/platformio.ini'
+      - 'variants/rak_wismesh_tag/platformio.ini'
+      - 'platformio.ini'
       - '.github/workflows/mcrpc.yml'
   pull_request:
     paths:
-      - 'lib/mcrpc/**'
       - 'examples/mcrpc/**'
-      - 'scripts/*mcrpc*'
+      - 'variants/heltec_v3/platformio.ini'
+      - 'variants/rak_wismesh_tag/platformio.ini'
+      - 'platformio.ini'
       - '.github/workflows/mcrpc.yml'
   workflow_dispatch:
 
 jobs:
-  desktop:
+  # CI uses committed [mcrpc_lib] GitHub pin — never platformio.local.ini
+  note:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-      - name: Install
-        run: sudo apt-get update && sudo apt-get install -y cmake g++ python3
-      - name: Run standalone suite
-        run: ./lib/mcrpc/scripts/test/run-all.sh
+      - name: Assert no local override in CI checkout
+        run: |
+          test ! -f platformio.local.ini
+          grep -q 'mcrpc_lib' platformio.ini
+          grep -q '\${mcrpc_lib.lib}' variants/heltec_v3/platformio.ini
+          grep -q '\${mcrpc_lib.lib}' variants/rak_wismesh_tag/platformio.ini
+          echo "Release dependency wiring OK"
+      - name: Show pinned mcRPC
+        run: grep -A2 '\[mcrpc_lib\]' platformio.ini
