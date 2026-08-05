@@ -18,7 +18,7 @@ HA Chat / meshcore.request
   → HA classify_inbound / correlator
 ```
 
-Diagnostics now record `tx_pipeline`, `recent_traces` (`tx_ok` / `tx_error` with
+Diagnostics record `tx_pipeline`, `recent_traces` (`tx_ok` / `tx_error` with
 `classified`, `raw_tx` / `transmitted_payload`), RTT, packet loss, pending
 requests, and parser statistics.
 
@@ -26,50 +26,50 @@ requests, and parser statistics.
 
 ### 1. Companion error conflation (HA-visible `ERR_CODE_NOT_FOUND`)
 
-`CMD_SEND_CHANNEL_TXT_MSG` returned `ERR_CODE_NOT_FOUND` when **either**:
+`CMD_SEND_CHANNEL_TXT_MSG` returned `ERR_CODE_NOT_FOUND` when **either**
+invalid `channel_idx` **or** `sendGroupMessage()` failed (pool/queue full).
 
-- `channel_idx` was invalid, **or**
-- `sendGroupMessage()` failed (packet pool / outbound queue full)
+**Fix:** `NOT_FOUND` only for bad channel; `TABLE_FULL` when send fails.
 
-So stress-driven pool exhaustion was mislabeled as “not found”.
+### 2. mcRPC single-flight silent drop
 
-**Fix:** return `ERR_CODE_NOT_FOUND` only for bad channel; return
-`ERR_CODE_TABLE_FULL` when send fails (matches `CMD_SEND_CHANNEL_DATA`).
+Previously `getOutboundTotal() > 0` returned false with no queue.
 
-### 2. mcRPC firmware single-flight silent drop (response funnel)
+**Fix:** reply queue depth `MCRPC_TX_QUEUE` (default 8) + counters
+`tx_ok` / `tx_queued` / `tx_drop_busy` / `tx_drop_alloc` / `tx_drop_queue_full`.
 
-`McRpcMesh::sendChannelText` previously:
+### Backpressure vs retry (RC decision)
 
-```cpp
-if (_mgr->getOutboundTotal() > 0) return false;
-```
+| Option | Verdict |
+|--------|---------|
+| Larger queue | Helps micro-bursts only |
+| Infinite retry | Stale/`#id` duplicates; fights airtime |
+| Counted drop when full | **Current policy** — visible in counters / HA timeouts |
+| Block inbound until TX free | Risks stalling embedded RX loop |
 
-Under burst load, dispatch succeeded but replies were **discarded** with no
-queue and no error text. That explains many handled requests with few RF
-responses.
+Do **not** add blind retries in RC. When `tx_drop_queue_full` rises, slow the
+requester (spacing / concurrency). Queue is backpressure signal, not a lossy
+black hole without metrics.
 
-**Fix:** small outbound reply queue drained in `loopMcRpc()`, plus counters
-`tx_ok` / `tx_queued` / `tx_drop_*`.
+### 3. Airtime / pool — hard RF limit (~8 on-air)
 
-### 3. Airtime / queue limits (on-air ≈ 8)
+MeshCore `tx_budget` (~50% airtime by default) and pools (SensorMesh 32,
+companion 16) **cap** sustained flood GRP_TXT. Expecting 100 on-air completions
+from a 100-burst is incorrect for this architecture.
 
-MeshCore duty-cycle (`tx_budget`) and shared packet pool (SensorMesh pool 32,
-companion pool 16) defer or drop floods. Companion may still have accepted
-earlier frames as OK while later ones fail with `TABLE_FULL`. This matches a
-small number of completed RF transmissions during a 100-burst.
+> QA must pace Chat requests within companion OK rate and node airtime;
+> use `packet_loss_percent` / `tx_pipeline`, not 1:1 assumptions.
 
 ### 4. HA correlation window
 
-Timeouts, policy denials, and dedup reduce correlated “responses” below TX
-attempts (100 → ~40) even when some RF traffic occurred.
+Timeouts, policy denials, and dedup reduce correlated responses (100 → ~40).
 
 ## Expected post-fix behavior
 
 | Stage | Before | After |
 |-------|--------|-------|
-| Companion pool exhaustion | `ERR_CODE_NOT_FOUND` | `ERR_CODE_TABLE_FULL` |
-| Busy radio on mcRPC node | Silent reply drop | Queued (up to 8) then counted drop |
-| Diagnostics | Opaque errors | `tx_pipeline` + classified traces |
+| Companion pool exhaustion | `NOT_FOUND` | `TABLE_FULL` |
+| Busy radio on node | Silent drop | Queue then counted drop |
+| Diagnostics | Opaque | `tx_pipeline` + classified traces |
 
-Re-run stress on **mcCtrl only**; download diagnostics and confirm
-`tx_errors_table_full` vs `tx_errors_not_found` split.
+Re-run stress on **mcCtrl only**.
