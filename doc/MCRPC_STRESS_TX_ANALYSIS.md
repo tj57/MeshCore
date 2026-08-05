@@ -1,10 +1,31 @@
-# Stress / TX pipeline analysis (100 → 40 → 8)
+# Stress / TX pipeline analysis
 
-## Symptom
+## Historical symptom (why the old burst failed)
 
-Under Chat stress: **100** requests → **~40** correlated responses → **~8**
-successful on-air transmissions, with companion errors reported as
-`ERR_CODE_NOT_FOUND`.
+Under an unrealistic Chat stress of **100** back-to-back requests, labs observed
+roughly **~40** correlated responses and **~8** successful on-air transmissions,
+with companion errors often reported as `ERR_CODE_NOT_FOUND`.
+
+That burst is **not** the supported test methodology. Expecting 100% RF delivery
+from a 100-ping flood is incorrect for MeshCore flood GRP_TXT.
+
+## Supported methodology
+
+See meshcore-ha [`docs/STRESS_METHODOLOGY.md`](https://github.com/tj57/meshcore-ha/blob/mcrpc/docs/STRESS_METHODOLOGY.md):
+
+| Profile | Pattern |
+|---------|---------|
+| Warm-up | 5 requests, 1 s interval |
+| Light load | 10 requests, 2 s interval |
+| Continuous short | paced traffic for 5 minutes |
+| Continuous long | paced traffic for 30 minutes |
+
+Measure: reply success, average RTT, queue drops, packet drops, memory growth, CPU.
+
+Saturation signals (`busy`, `queue_full`, `table_full`, backpressure) are
+**envelope reports**, not unexpected protocol failures under load.
+
+Always on the **private** channel / Config Entry path — **never Public**.
 
 ## Instrumented path
 
@@ -51,18 +72,15 @@ Do **not** add blind retries in RC. When `tx_drop_queue_full` rises, slow the
 requester (spacing / concurrency). Queue is backpressure signal, not a lossy
 black hole without metrics.
 
-### 3. Airtime / pool — hard RF limit (~8 on-air)
+### 3. Airtime / pool — hard RF limit
 
 MeshCore `tx_budget` (~50% airtime by default) and pools (SensorMesh 32,
-companion 16) **cap** sustained flood GRP_TXT. Expecting 100 on-air completions
-from a 100-burst is incorrect for this architecture.
-
-> QA must pace Chat requests within companion OK rate and node airtime;
-> use `packet_loss_percent` / `tx_pipeline`, not 1:1 assumptions.
+companion 16) **cap** sustained flood GRP_TXT. The operating envelope is the
+paced profiles above — not 1:1 completion of a 100-burst.
 
 ### 4. HA correlation window
 
-Timeouts, policy denials, and dedup reduce correlated responses (100 → ~40).
+Timeouts, policy denials, and dedup reduce correlated responses under overload.
 
 ## Expected post-fix behavior
 
@@ -72,4 +90,5 @@ Timeouts, policy denials, and dedup reduce correlated responses (100 → ~40).
 | Busy radio on node | Silent drop | Queue then counted drop |
 | Diagnostics | Opaque | `tx_pipeline` + classified traces |
 
-Re-run stress on **mcCtrl only**.
+Re-run stress with [STRESS_METHODOLOGY.md](https://github.com/tj57/meshcore-ha/blob/mcrpc/docs/STRESS_METHODOLOGY.md)
+on the private channel only (Config Entry title may be `mcCtrl`).
