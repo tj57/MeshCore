@@ -1127,11 +1127,15 @@ void MyMesh::handleCmdFrame(size_t len) {
       writeErrFrame(ERR_CODE_UNSUPPORTED_CMD);
     } else {
       ChannelDetails channel;
-      bool success = getChannel(channel_idx, channel);
-      if (success && sendGroupMessage(msg_timestamp, channel.channel, _prefs.node_name, text, len - i)) {
+      // Distinguish missing channel from TX queue/pool exhaustion.
+      // Collapsing both into ERR_CODE_NOT_FOUND made stress tests look like
+      // "bad channel" when the real failure was packet-pool / send-queue full.
+      if (!getChannel(channel_idx, channel)) {
+        writeErrFrame(ERR_CODE_NOT_FOUND); // bad channel_idx
+      } else if (sendGroupMessage(msg_timestamp, channel.channel, _prefs.node_name, text, len - i)) {
         writeOKFrame();
       } else {
-        writeErrFrame(ERR_CODE_NOT_FOUND); // bad channel_idx
+        writeErrFrame(ERR_CODE_TABLE_FULL); // queue/pool exhausted
       }
     }
   } else if (cmd_frame[0] == CMD_SEND_CHANNEL_DATA) { // send GroupChannel datagram

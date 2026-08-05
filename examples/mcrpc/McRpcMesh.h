@@ -16,6 +16,10 @@
 #define MCRPC_MAX_TEXT (10 * 16)
 #endif
 
+#ifndef MCRPC_TX_QUEUE
+#define MCRPC_TX_QUEUE 8
+#endif
+
 #ifndef MCRPC_FW_VERSION
 #define MCRPC_FW_VERSION "mcrpc-0.1.0"
 #endif
@@ -42,6 +46,14 @@ public:
 
   bool sendChannelText(const char* text);
   void rebuildChannel();
+
+  // TX pipeline counters (stress / diagnostics)
+  uint32_t txOk() const { return _tx_ok; }
+  uint32_t txQueued() const { return _tx_queued; }
+  uint32_t txDropBusy() const { return _tx_drop_busy; }
+  uint32_t txDropAlloc() const { return _tx_drop_alloc; }
+  uint32_t txDropQueueFull() const { return _tx_drop_queue_full; }
+  uint8_t txQueueDepth() const { return _tx_q_count; }
 
   // HostServices
   const char* nodeName() override;
@@ -80,6 +92,21 @@ private:
   bool _channel_ready;
   uint32_t _boot_ms;
   bool _btn_down;
+
+  // Outbound reply queue — avoids silent drops when radio outbound is busy.
+  char _tx_queue[MCRPC_TX_QUEUE][MCRPC_MAX_TEXT + 1];
+  uint8_t _tx_q_head;
+  uint8_t _tx_q_tail;
+  uint8_t _tx_q_count;
+  uint32_t _tx_ok;
+  uint32_t _tx_queued;
+  uint32_t _tx_drop_busy;
+  uint32_t _tx_drop_alloc;
+  uint32_t _tx_drop_queue_full;
+
+  bool enqueueTx(const char* text);
+  bool trySendNow(const char* text);
+  void drainTxQueue();
 
   static bool publishThunk(const char* text, void* ctx);
   static void gpsDoneThunk(bool ok, float lat, float lon, float alt, int sats, float hdop,

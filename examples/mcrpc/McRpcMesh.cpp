@@ -14,8 +14,17 @@ McRpcMesh::McRpcMesh(mesh::MainBoard& board, mesh::Radio& radio, mesh::Milliseco
     _gps_session(sensors),
     _channel_ready(false),
     _boot_ms(0),
-    _btn_down(false) {
+    _btn_down(false),
+    _tx_q_head(0),
+    _tx_q_tail(0),
+    _tx_q_count(0),
+    _tx_ok(0),
+    _tx_queued(0),
+    _tx_drop_busy(0),
+    _tx_drop_alloc(0),
+    _tx_drop_queue_full(0) {
   memset(&_channel, 0, sizeof(_channel));
+  memset(_tx_queue, 0, sizeof(_tx_queue));
 }
 
 void McRpcMesh::beginMcRpc(FILESYSTEM* fs) {
@@ -79,6 +88,7 @@ void McRpcMesh::beginMcRpc(FILESYSTEM* fs) {
 }
 
 void McRpcMesh::loopMcRpc() {
+  drainTxQueue();
   _rpc.loop();
 #ifdef MCRPC_ENABLE_GPS
   _gps_session.loop();
@@ -96,9 +106,29 @@ void McRpcMesh::rebuildChannel() {
   _rpc.setNodeIdentity(_rpc.config().nodeName(), _rpc.config().channelName());
 }
 
-bool McRpcMesh::sendChannelText(const char* text) {
+bool McRpcMesh::enqueueTx(const char* text) {
+  if (_tx_q_count >= MCRPC_TX_QUEUE) {
+    _tx_drop_queue_full++;
+    MESH_DEBUG_PRINTLN("mcRPC TX drop queue_full depth=%u text=%.40s",
+                       (unsigned)_tx_q_count, text ? text : "");
+    return false;
+  }
+  size_t n = strlen(text);
+  if (n > MCRPC_MAX_TEXT) n = MCRPC_MAX_TEXT;
+  memcpy(_tx_queue[_tx_q_tail], text, n);
+  _tx_queue[_tx_q_tail][n] = 0;
+  _tx_q_tail = (uint8_t)((_tx_q_tail + 1) % MCRPC_TX_QUEUE);
+  _tx_q_count++;
+  _tx_queued++;
+  return true;
+}
+
+bool McRpcMesh::trySendNow(const char* text) {
   if (!_channel_ready || text == nullptr || text[0] == 0) return false;
-  if (_mgr->getOutboundTotal() > 0) return false;
+  if (_mgr->getOutboundTotal() > 0) {
+    _tx_drop_busy++;
+    return false;
+  }
 
   uint8_t temp[5 + MCRPC_MAX_TEXT + 32];
   uint32_t timestamp = getRTCClock()->getCurrentTimeUnique();
@@ -117,17 +147,47 @@ bool McRpcMesh::sendChannelText(const char* text) {
   memcpy((char*)&temp[5] + prefix_len, text, text_len);
   ((char*)&temp[5])[prefix_len + text_len] = 0;
 
-  // If reply starts with #id, rewrite to "name#id body" per protocol examples
-  // Transport already has "name: " prefix from MeshCore convention; body may
-  // include "#42 pong". Spec examples use "ha#42 pong" as the full message —
-  // acceptable on channel as "tracker: #42 pong".
-
   mesh::Packet* pkt =
       createGroupDatagram(PAYLOAD_TYPE_GRP_TXT, _channel.channel, temp,
                           (size_t)(5 + prefix_len + text_len));
-  if (pkt == nullptr) return false;
+  if (pkt == nullptr) {
+    _tx_drop_alloc++;
+    MESH_DEBUG_PRINTLN("mcRPC TX drop alloc_fail text=%.40s", text);
+    return false;
+  }
   sendFlood(pkt);
+  _tx_ok++;
+  MESH_DEBUG_PRINTLN("mcRPC TX ok #%lu q=%u text=%.40s", (unsigned long)_tx_ok,
+                     (unsigned)_tx_q_count, text);
   return true;
+}
+
+void McRpcMesh::drainTxQueue() {
+  while (_tx_q_count > 0) {
+    if (_mgr->getOutboundTotal() > 0) return;
+    const char* text = _tx_queue[_tx_q_head];
+    // Decrement busy counter pretick — trySendNow increments drop_busy if blocked.
+    uint32_t busy_before = _tx_drop_busy;
+    if (!trySendNow(text)) {
+      // Still busy or alloc fail: keep head; alloc failures drop the slot.
+      if (_tx_drop_busy > busy_before) return;
+      // alloc failed — drop this queued item to avoid wedging the queue
+      _tx_q_head = (uint8_t)((_tx_q_head + 1) % MCRPC_TX_QUEUE);
+      _tx_q_count--;
+      return;
+    }
+    _tx_q_head = (uint8_t)((_tx_q_head + 1) % MCRPC_TX_QUEUE);
+    _tx_q_count--;
+  }
+}
+
+bool McRpcMesh::sendChannelText(const char* text) {
+  if (!_channel_ready || text == nullptr || text[0] == 0) return false;
+  if (trySendNow(text)) return true;
+  // Radio busy or momentary alloc failure: queue for loopMcRpc drain.
+  // Previously a single-flight gate silently discarded replies under burst
+  // load (stress: many handled requests, few on-air responses).
+  return enqueueTx(text);
 }
 
 bool McRpcMesh::publishThunk(const char* text, void* ctx) {

@@ -820,6 +820,11 @@ Bytes 1-6: ACK Code (6 bytes, hex)
 | 5    | `ERR_CODE_FILE_IO_ERROR`   | Filesystem or storage I/O failure                                            |
 | 6    | `ERR_CODE_ILLEGAL_ARG`     | Invalid argument (bad length, out-of-range value, reserved field, etc.)      |
 
+For `CMD_SEND_CHANNEL_TXT_MSG`: invalid `channel_idx` → `NOT_FOUND`;
+`sendGroupMessage` failure (packet pool / outbound queue exhausted) →
+`TABLE_FULL` (same split as `CMD_SEND_CHANNEL_DATA`). Older firmwares
+incorrectly returned `NOT_FOUND` for both cases.
+
 **Note**: Error codes may vary by firmware version. Always check byte 1 of `PACKET_ERROR` response, and treat unknown codes as generic errors.
 
 ### Frame Handling
