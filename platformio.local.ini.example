@@ -12,5 +12,5 @@ lib = symlink://../mcrpc
 
 ; Optional alternatives:
 ; lib = file://../mcrpc
-; lib = https://github.com/tj57/mcrpc.git#v1.0.0
-; lib = mcrpc @ ^1.0.0          ; after registry publish
+; lib = https://github.com/tj57/mcrpc.git#v1.1.0-beta
+; lib = mcrpc @ ^1.1.0          ; after registry publish

@@ -1,5 +1,6 @@
 #include "McRpcMesh.h"
 
+#include <Utils.h>
 #include <stdio.h>
 #include <ctype.h>
 
@@ -67,7 +68,14 @@ void McRpcMesh::beginMcRpc(FILESYSTEM* fs) {
   _rpc.setPublishHandler(&McRpcMesh::publishThunk, this);
   _rpc.setFirmwareVersion(MCRPC_FW_VERSION);
   _rpc.setProfile(_rpc.config().profile());
+  _rpc.setTag(_rpc.config().profile());  // RFC-0001: tag preferred; profile kept for 1.0
   _rpc.setNodeIdentity(_rpc.config().nodeName(), _rpc.config().channelName());
+  {
+    // Stable identity id = full public key hex (clients may address with @prefix)
+    static char id_hex[PUB_KEY_SIZE * 2 + 1];
+    mesh::Utils::toHex(id_hex, self_id.pub_key, PUB_KEY_SIZE);
+    _rpc.setNodeId(id_hex);
+  }
   _rpc.setIdentityCallbacks(&McRpcMesh::uptimeThunk, &McRpcMesh::rssiThunk, this);
   _rpc.setUserData(this);
 
@@ -83,7 +91,7 @@ void McRpcMesh::beginMcRpc(FILESYSTEM* fs) {
 #endif
 
   _rpc.begin();
-  MESH_DEBUG_PRINTLN("mcRPC ready name=%s profile=%s channel=#%s", _rpc.config().nodeName(),
+  MESH_DEBUG_PRINTLN("mcRPC ready name=%s tag=%s channel=#%s", _rpc.config().nodeName(),
                      _rpc.config().profile(), _rpc.config().channelName());
 }
 

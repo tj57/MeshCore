@@ -21,7 +21,7 @@
 #endif
 
 #ifndef MCRPC_FW_VERSION
-#define MCRPC_FW_VERSION "mcrpc-0.1.0"
+#define MCRPC_FW_VERSION "mcrpc-1.1.0-beta"
 #endif
 
 /**

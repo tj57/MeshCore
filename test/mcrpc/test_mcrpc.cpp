@@ -88,6 +88,10 @@ static void test_parser_addressing() {
 
   EXPECT(Parser::parse("GROUP:sensors ping", r) == ParseResult::Ok);
   EXPECT(r.address_kind == AddressKind::Group);
+
+  EXPECT(Parser::parse("@3CBBF74E ping", r) == ParseResult::Ok);
+  EXPECT(r.address_kind == AddressKind::Id);
+  EXPECT(Parser::parse("#A31C ping", r) != ParseResult::Ok);
 }
 
 static void test_parser_case_and_args() {
