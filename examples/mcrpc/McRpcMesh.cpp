@@ -48,6 +48,13 @@ void McRpcMesh::beginMcRpc(FILESYSTEM* fs) {
   _rpc.config().setDefaults(MCRPC_DEFAULT_NAME, MCRPC_DEFAULT_PROFILE, MCRPC_DEFAULT_CHANNEL,
                             MCRPC_DEFAULT_PSK);
 
+#ifdef MCRPC_DEFAULT_PSK_HEX
+  // Hex form matches MeshCore companion / HA channel_secret (16 bytes as 32 hex chars).
+  if (!_rpc.config().setChannelPskHex(MCRPC_DEFAULT_PSK_HEX)) {
+    MESH_DEBUG_PRINTLN("mcRPC: invalid MCRPC_DEFAULT_PSK_HEX (need 32 hex chars)");
+  }
+#endif
+
 #ifdef MCRPC_ENABLE_GPS
   _rpc.config().prefs().feat_gps = 1;
 #endif
@@ -58,6 +65,18 @@ void McRpcMesh::beginMcRpc(FILESYSTEM* fs) {
 
   _cfg_store.setFilesystem(fs);
   _rpc.config().begin(&_cfg_store);
+
+#if defined(MCRPC_FORCE_CHANNEL_DEFAULTS) && (MCRPC_FORCE_CHANNEL_DEFAULTS)
+  // Lab/flash: re-apply build-time channel so /mcrpc_cfg cannot keep an old PSK.
+  _rpc.config().setChannelName(MCRPC_DEFAULT_CHANNEL);
+#ifdef MCRPC_DEFAULT_PSK_HEX
+  _rpc.config().setChannelPskHex(MCRPC_DEFAULT_PSK_HEX);
+#else
+  _rpc.config().setChannelPskAscii(MCRPC_DEFAULT_PSK);
+#endif
+  _rpc.config().save();
+#endif
+
   // Prefer MeshCore node name from NodePrefs when set
   if (getNodeName() && getNodeName()[0]) {
     _rpc.config().setNodeName(getNodeName());

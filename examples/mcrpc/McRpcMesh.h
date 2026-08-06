@@ -21,7 +21,7 @@
 #endif
 
 #ifndef MCRPC_FW_VERSION
-#define MCRPC_FW_VERSION "mcrpc-1.1.0-beta"
+#define MCRPC_FW_VERSION "mcrpc-1.1.0"
 #endif
 
 /**
@@ -66,6 +66,7 @@ public:
   bool requestGpsFix() override;
   bool gpsBusy() override;
   bool readButtonPressed() override;
+  void setButtonDown(bool down) { _btn_down = down; }
 
 protected:
   Trigger low_batt, critical_batt;

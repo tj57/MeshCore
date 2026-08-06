@@ -12,7 +12,20 @@ Configured in `mcrpc::Config` (`/mcrpc_cfg`):
 | `channel_psk[16]` | Raw shared secret (ASCII or binary) |
 | `listen_enabled` | If 0, inbound GRP_TXT is ignored |
 
-Build flags `MCRPC_DEFAULT_CHANNEL` / `MCRPC_DEFAULT_PSK` seed defaults **once**; after first boot, `/mcrpc_cfg` is the source of truth.
+Build flags:
+
+| Flag | Meaning |
+|------|---------|
+| `MCRPC_DEFAULT_CHANNEL` | Channel name string (e.g. `mcCtrl`) |
+| `MCRPC_DEFAULT_PSK` | Optional ASCII ≤16 bytes (legacy lab) |
+| `MCRPC_DEFAULT_PSK_HEX` | **Preferred**: 32 hex chars → 16 raw bytes (same form as HA / companion) |
+| `MCRPC_FORCE_CHANNEL_DEFAULTS` | If `1`, overwrite `/mcrpc_cfg` channel+PSK from build flags each boot |
+
+**Secrets:** put real `MCRPC_DEFAULT_PSK_HEX` only in gitignored `platformio.secrets.ini`
+(copy from `platformio.secrets.ini.example`). Never commit PSKs.
+
+Default seed once unless `MCRPC_FORCE_CHANNEL_DEFAULTS=1`; after first boot without force,
+`/mcrpc_cfg` is the source of truth.
 
 ## PSK handling
 

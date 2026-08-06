@@ -85,15 +85,34 @@ void loop() {
 #endif
 
 #ifdef MCRPC_HAS_USER_BTN
+  // Edge detect → event button_down / button_up on the private mcRPC channel.
+  static bool was_down = false;
+  const bool down = user_btn.isPressed();
+  if (down != was_down) {
+    the_mesh.setButtonDown(down);
+    if (down) {
+#ifdef MCRPC_ENABLE_BUTTON
+      the_mesh.buttonFeature().notifyDown();
+#endif
+#ifdef MCRPC_ENABLE_GPS
+      // Tracker profile: wake GPS on press; OnDemandGps powers off after fix/timeout.
+      if (!the_mesh.onDemandGps().isBusy()) {
+        the_mesh.onDemandGps().request();
+      }
+#endif
+    } else {
+#ifdef MCRPC_ENABLE_BUTTON
+      the_mesh.buttonFeature().notifyUp();
+#endif
+    }
+    was_down = down;
+  }
+
+  // Keep click path for legacy event button_pressed (short click after release).
   int ev = user_btn.check();
   if (ev == BUTTON_EVENT_CLICK) {
 #ifdef MCRPC_ENABLE_BUTTON
     the_mesh.buttonFeature().notifyPressed();
-#endif
-#ifdef MCRPC_ENABLE_GPS
-    if (!the_mesh.onDemandGps().isBusy()) {
-      the_mesh.onDemandGps().request();
-    }
 #endif
   }
 #endif
