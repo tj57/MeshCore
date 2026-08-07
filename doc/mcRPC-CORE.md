@@ -289,7 +289,7 @@ event motion
 
 event gps_fix
 
-event button_pressed
+event button.pressed
 ```
 
 Events never require requests.
@@ -338,31 +338,34 @@ Profiles define additional commands.
 all discover
 ```
 
-↓
+↓ (Protocol 1.2 / RFC-0002)
 
 ```
-ha profile=gateway fw=2026.8 protocol=1.0 sdk=1.0.0
+ha id=3cbbf74e tag=ha fw=2.11.0 v=1.2 up=1h33m caps=battery,button
 
-tracker profile=tracker fw=1.2 protocol=1.0 sdk=1.0.0
-
-relay1 profile=relay fw=1.0 protocol=1.0 sdk=1.0.0
+tracker id=a1b2c3d4 tag=tracker fw=1.2.0 v=1.2 up=12m caps=battery,gps,button
 ```
 
 Required fields (after node name):
 
 ```
-profile=
+id=
 fw=
-protocol=
-sdk=
+v=
 ```
+
+Recommended: `tag=` `up=` `caps=`
 
 | Field | Meaning |
 |-------|---------|
-| `protocol` | Wire protocol version (`major.minor`), e.g. `1.0` |
-| `sdk` | Library/SDK version (semver), e.g. `1.0.0` |
+| `v` | Wire protocol version (`major.minor`), e.g. `1.2` |
+| `fw` | Application / firmware image version |
+| `id` | 8-hex identity prefix (`id_full=` on status) |
 
 Clients MUST ignore unknown discover fields (forward compatible).
+
+`call` (RFC-0002): ordinary command, e.g. `ha call button.pressed count=4` →
+`ok` / `err …` with `key=value` payload only. Parser MUST NOT special-case RPC.
 
 ---
 
@@ -375,11 +378,15 @@ status
 
 name=
 
-profile=
+id=
+
+id_full=
 
 fw=
 
-uptime=
+v=
+
+up=
 
 rssi=
 ```

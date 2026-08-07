@@ -12,8 +12,10 @@
 #include "drivers/OnDemandGps.h"
 #include "ArduinoFsConfigStore.h"
 
+// MeshCore createGroupDatagram allows ~168 bytes plaintext; leave room for
+// timestamp(4)+type(1)+"<name>: " prefix. 160 is the practical body budget.
 #ifndef MCRPC_MAX_TEXT
-#define MCRPC_MAX_TEXT (10 * 16)
+#define MCRPC_MAX_TEXT 160
 #endif
 
 #ifndef MCRPC_TX_QUEUE

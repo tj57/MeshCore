@@ -81,10 +81,10 @@ Parser is host-testable without MeshCore (`test/mcrpc`).
 ## Event lifecycle
 
 ```
-Feature::publishEvent("button_pressed", "count=3")
+Feature::publishEvent("button.pressed", "count=3")
   → EventBus::publish
   → each subscriber
-       default: McRpc formats "event button_pressed count=3" → mesh
+       default: McRpc formats "event button.pressed count=3" → mesh
        future: HA bridge, logger, display, BLE, storage
 ```
 

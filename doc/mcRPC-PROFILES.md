@@ -26,15 +26,27 @@ Use `MCRPC_FORCE_CHANNEL_DEFAULTS=1` when flashing so `/mcrpc_cfg` cannot keep a
 
 ### switch (Heltec button)
 
-Mandatory: `ping status discovery help caps`  
+Mandatory: `ping status discovery help caps call`  
 Feature: `button button_state battery voltage charging`
 
-Events on the configured private channel only:
+Hardware (Heltec WiFi LoRa 32 V3):
 
-- `event button_down` — press edge
-- `event button_up count=N` — release edge
-- `event button_pressed count=N` — short click (compat)
-- `event battery_low`
+- OLED SSD1306 (enabled via `DISPLAY_CLASS`)
+- **PRG** = `PIN_USER_BTN` (GPIO 0) → button id **1**
+- Optional external button on **`PIN_USER_BTN2`** (default GPIO **4**, GND when pressed) → button id **2**
+
+Events on the configured private channel only (RFC-0002 dotted names):
+
+- `event button.pressed count=N` / `event button.down` / `event button.up count=N` (btn 1)
+- `… id=2 …` variants for btn 2
+- `event battery.low`
+
+Optional RPC to HA (host-configured target):
+
+```text
+ha call button.pressed count=4
+→ ok
+```
 
 ### tracker (LW010 GPS)
 
@@ -42,10 +54,10 @@ Mandatory + `gps location track battery voltage charging button button_state`
 
 Events:
 
-- `event button_down` / `event button_up` / `event button_pressed`
-- `event gps_fix` (after on-demand fix) + `gps lat=… lon=…` data line
-- `event gps_nofix` / `err gps_no_fix` on timeout
-- `event battery_low`
+- `event button.down` / `event button.up` / `event button.pressed`
+- `event gps.fix` (after on-demand fix) + `gps lat=… lon=…` data line
+- `event gps.nofix` / `err gps_no_fix` on timeout
+- `event battery.low`
 
 Button **down** starts an on-demand GPS session. GPS is powered only while waiting
 for a fix (or until timeout), then powered off again.

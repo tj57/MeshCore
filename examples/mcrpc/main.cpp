@@ -2,6 +2,10 @@
 
 #include <helpers/ui/MomentaryButton.h>
 
+#ifdef DISPLAY_CLASS
+#include "McRpcUi.h"
+#endif
+
 StdRNG fast_rng;
 SimpleMeshTables tables;
 McRpcMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_clock, tables);
@@ -10,8 +14,19 @@ McRpcMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_cloc
 #ifndef DISPLAY_CLASS
 // Boards without DISPLAY_CLASS still need a button instance for mcRPC.
 static MomentaryButton user_btn(PIN_USER_BTN, 1000, true);
+#if defined(PIN_USER_BTN2) && (PIN_USER_BTN2 >= 0)
+static MomentaryButton user_btn2(PIN_USER_BTN2, 1000, true);
+#endif
 #endif
 #define MCRPC_HAS_USER_BTN 1
+#endif
+
+#ifdef DISPLAY_CLASS
+#if defined(PIN_USER_BTN2) && (PIN_USER_BTN2 >= 0)
+static McRpcUi ui_task(display, &user_btn, &user_btn2);
+#else
+static McRpcUi ui_task(display, &user_btn, nullptr);
+#endif
 #endif
 
 void halt() {
@@ -70,10 +85,40 @@ void setup() {
   the_mesh.begin(fs);
   the_mesh.beginMcRpc(fs);
 
+#ifdef DISPLAY_CLASS
+  if (display.begin()) {
+    ui_task.begin(the_mesh.nodeName(), the_mesh.profile(), the_mesh.rpc().config().channelName());
+  }
+#endif
+
 #if defined(ADVERT_BOOT_DELAY_MS)
   delay(ADVERT_BOOT_DELAY_MS);
 #endif
   the_mesh.sendSelfAdvertisement(500, true);
+}
+
+static void handleButtonEdge(MomentaryButton& btn, bool& was_down, uint8_t btn_id) {
+  const bool down = btn.isPressed();
+  if (down == was_down) return;
+  if (btn_id <= 1) {
+    the_mesh.setButtonDown(down);
+  }
+#ifdef MCRPC_ENABLE_BUTTON
+  if (down) {
+    the_mesh.buttonFeature().notifyDown(btn_id);
+  } else {
+    the_mesh.buttonFeature().notifyUp(btn_id);
+  }
+#endif
+#ifdef MCRPC_ENABLE_GPS
+  if (down && btn_id == 1 && !the_mesh.onDemandGps().isBusy()) {
+    the_mesh.onDemandGps().request();
+  }
+#endif
+#ifdef DISPLAY_CLASS
+  ui_task.poke();
+#endif
+  was_down = down;
 }
 
 void loop() {
@@ -85,36 +130,45 @@ void loop() {
 #endif
 
 #ifdef MCRPC_HAS_USER_BTN
-  // Edge detect → event button_down / button_up on the private mcRPC channel.
-  static bool was_down = false;
-  const bool down = user_btn.isPressed();
-  if (down != was_down) {
-    the_mesh.setButtonDown(down);
-    if (down) {
-#ifdef MCRPC_ENABLE_BUTTON
-      the_mesh.buttonFeature().notifyDown();
-#endif
-#ifdef MCRPC_ENABLE_GPS
-      // Tracker profile: wake GPS on press; OnDemandGps powers off after fix/timeout.
-      if (!the_mesh.onDemandGps().isBusy()) {
-        the_mesh.onDemandGps().request();
-      }
-#endif
-    } else {
-#ifdef MCRPC_ENABLE_BUTTON
-      the_mesh.buttonFeature().notifyUp();
-#endif
-    }
-    was_down = down;
-  }
+  static bool was_down1 = false;
+  handleButtonEdge(user_btn, was_down1, 1);
 
-  // Keep click path for legacy event button_pressed (short click after release).
+#if defined(PIN_USER_BTN2) && (PIN_USER_BTN2 >= 0)
+  static bool was_down2 = false;
+  handleButtonEdge(user_btn2, was_down2, 2);
+#endif
+
+#ifdef DISPLAY_CLASS
+  ui_task.setButtonState(was_down1,
+#if defined(PIN_USER_BTN2) && (PIN_USER_BTN2 >= 0)
+                         was_down2
+#else
+                         false
+#endif
+  );
+  ui_task.loop();
+#endif
+
   int ev = user_btn.check();
   if (ev == BUTTON_EVENT_CLICK) {
 #ifdef MCRPC_ENABLE_BUTTON
-    the_mesh.buttonFeature().notifyPressed();
+    the_mesh.buttonFeature().notifyPressed(1);
+#endif
+#ifdef DISPLAY_CLASS
+    ui_task.poke();
 #endif
   }
+#if defined(PIN_USER_BTN2) && (PIN_USER_BTN2 >= 0)
+  int ev2 = user_btn2.check();
+  if (ev2 == BUTTON_EVENT_CLICK) {
+#ifdef MCRPC_ENABLE_BUTTON
+    the_mesh.buttonFeature().notifyPressed(2);
+#endif
+#ifdef DISPLAY_CLASS
+    ui_task.poke();
+#endif
+  }
+#endif
 #endif
 
   if (Serial.available()) {

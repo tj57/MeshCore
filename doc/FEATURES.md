@@ -4,7 +4,7 @@
 |---------|------------|----------|--------|--------|
 | core | — | ping, status, discover, help, caps | — | done |
 | battery | battery | battery, voltage, charging | battery_low | done |
-| button | button | button, button_state | button_pressed | done |
+| button | button | button, button_state | button.pressed (+ call) | done |
 | gps | gps | gps, location, track | gps_fix | done |
 | relay | relay | relay, toggle, power | relay_changed | planned |
 | display | display | display, text, clear | — | planned |

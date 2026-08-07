@@ -67,20 +67,17 @@ void McRpcMesh::beginMcRpc(FILESYSTEM* fs) {
   _rpc.config().begin(&_cfg_store);
 
 #if defined(MCRPC_FORCE_CHANNEL_DEFAULTS) && (MCRPC_FORCE_CHANNEL_DEFAULTS)
-  // Lab/flash: re-apply build-time channel so /mcrpc_cfg cannot keep an old PSK.
+  // Lab/flash: re-apply build-time channel/identity so /mcrpc_cfg cannot keep old values.
   _rpc.config().setChannelName(MCRPC_DEFAULT_CHANNEL);
 #ifdef MCRPC_DEFAULT_PSK_HEX
   _rpc.config().setChannelPskHex(MCRPC_DEFAULT_PSK_HEX);
 #else
   _rpc.config().setChannelPskAscii(MCRPC_DEFAULT_PSK);
 #endif
+  // Keep short mcRPC name — do not use ADVERT_NAME ("Heltec Button") as identity.
+  _rpc.config().setNodeName(MCRPC_DEFAULT_NAME);
   _rpc.config().save();
 #endif
-
-  // Prefer MeshCore node name from NodePrefs when set
-  if (getNodeName() && getNodeName()[0]) {
-    _rpc.config().setNodeName(getNodeName());
-  }
 
   rebuildChannel();
 
@@ -347,7 +344,12 @@ void McRpcMesh::onGroupDataRecv(mesh::Packet* packet, uint8_t type, const mesh::
   uint8_t txt_type = data[4];
   if ((txt_type >> 2) != 0) return;  // plain only
 
+  // len may include AES padding zeroes; terminate safely within payload buffer.
+  if (len >= MAX_PACKET_PAYLOAD) len = MAX_PACKET_PAYLOAD - 1;
   data[len] = 0;
   const char* text = (const char*)&data[5];
-  _rpc.handleIncomingText(text);
+  MESH_DEBUG_PRINTLN("mcRPC RX: %.80s", text);
+  if (!_rpc.handleIncomingText(text)) {
+    MESH_DEBUG_PRINTLN("mcRPC RX ignored (not addressed / parse)");
+  }
 }

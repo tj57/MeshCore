@@ -21,6 +21,9 @@ extern EnvironmentSensorManager sensors;
 #ifdef DISPLAY_CLASS
   extern DISPLAY_CLASS display;
   extern MomentaryButton user_btn;
+#if defined(PIN_USER_BTN2) && (PIN_USER_BTN2 >= 0)
+  extern MomentaryButton user_btn2;
+#endif
 #endif
 
 bool radio_init();
