@@ -23,7 +23,7 @@
 #endif
 
 #ifndef MCRPC_FW_VERSION
-#define MCRPC_FW_VERSION "mcrpc-1.2.1"
+#define MCRPC_FW_VERSION "mcrpc-1.2.2"
 #endif
 
 /**
@@ -47,6 +47,7 @@ public:
   mcrpc::OnDemandGps& onDemandGps() { return _gps_session; }
 
   bool sendChannelText(const char* text);
+  bool sendChannelText(const char* text, uint32_t delay_ms);
   void rebuildChannel();
 
   // TX pipeline counters (stress / diagnostics)
@@ -98,6 +99,7 @@ private:
 
   // Outbound reply queue — avoids silent drops when radio outbound is busy.
   char _tx_queue[MCRPC_TX_QUEUE][MCRPC_MAX_TEXT + 1];
+  uint32_t _tx_delay_ms[MCRPC_TX_QUEUE];
   uint8_t _tx_q_head;
   uint8_t _tx_q_tail;
   uint8_t _tx_q_count;
@@ -107,13 +109,12 @@ private:
   uint32_t _tx_drop_alloc;
   uint32_t _tx_drop_queue_full;
 
-  bool enqueueTx(const char* text);
-  bool trySendNow(const char* text);
+  bool enqueueTx(const char* text, uint32_t delay_ms);
+  bool trySendNow(const char* text, uint32_t delay_ms);
   void drainTxQueue();
-  /** Multi-responder stagger (SensorMesh-style) so ``all`` replies don't collide. */
-  uint32_t replyDelayMillis(mesh::Packet* pkt);
 
-  static bool publishThunk(const char* text, void* ctx);
+  static bool publishExThunk(const char* text, uint32_t delay_ms, void* ctx);
+  static uint16_t entropyThunk(void* ctx);
   static void gpsDoneThunk(bool ok, float lat, float lon, float alt, int sats, float hdop,
                            void* ctx);
   static uint32_t uptimeThunk(void* ctx);

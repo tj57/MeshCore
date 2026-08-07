@@ -26,6 +26,7 @@ McRpcMesh::McRpcMesh(mesh::MainBoard& board, mesh::Radio& radio, mesh::Milliseco
     _tx_drop_queue_full(0) {
   memset(&_channel, 0, sizeof(_channel));
   memset(_tx_queue, 0, sizeof(_tx_queue));
+  memset(_tx_delay_ms, 0, sizeof(_tx_delay_ms));
 }
 
 void McRpcMesh::beginMcRpc(FILESYSTEM* fs) {
@@ -81,7 +82,8 @@ void McRpcMesh::beginMcRpc(FILESYSTEM* fs) {
 
   rebuildChannel();
 
-  _rpc.setPublishHandler(&McRpcMesh::publishThunk, this);
+  _rpc.setPublishExHandler(&McRpcMesh::publishExThunk, this);
+  _rpc.setEntropy(&McRpcMesh::entropyThunk, this);
   _rpc.setFirmwareVersion(MCRPC_FW_VERSION);
   _rpc.setProfile(_rpc.config().profile());
   _rpc.setTag(_rpc.config().profile());  // RFC-0001: tag preferred; profile kept for 1.0
@@ -130,7 +132,7 @@ void McRpcMesh::rebuildChannel() {
   _rpc.setNodeIdentity(_rpc.config().nodeName(), _rpc.config().channelName());
 }
 
-bool McRpcMesh::enqueueTx(const char* text) {
+bool McRpcMesh::enqueueTx(const char* text, uint32_t delay_ms) {
   if (_tx_q_count >= MCRPC_TX_QUEUE) {
     _tx_drop_queue_full++;
     MESH_DEBUG_PRINTLN("mcRPC TX drop queue_full depth=%u text=%.40s",
@@ -141,13 +143,14 @@ bool McRpcMesh::enqueueTx(const char* text) {
   if (n > MCRPC_MAX_TEXT) n = MCRPC_MAX_TEXT;
   memcpy(_tx_queue[_tx_q_tail], text, n);
   _tx_queue[_tx_q_tail][n] = 0;
+  _tx_delay_ms[_tx_q_tail] = delay_ms;
   _tx_q_tail = (uint8_t)((_tx_q_tail + 1) % MCRPC_TX_QUEUE);
   _tx_q_count++;
   _tx_queued++;
   return true;
 }
 
-bool McRpcMesh::trySendNow(const char* text) {
+bool McRpcMesh::trySendNow(const char* text, uint32_t delay_ms) {
   if (!_channel_ready || text == nullptr || text[0] == 0) return false;
   if (_mgr->getOutboundTotal() > 0) {
     _tx_drop_busy++;
@@ -179,7 +182,7 @@ bool McRpcMesh::trySendNow(const char* text) {
     MESH_DEBUG_PRINTLN("mcRPC TX drop alloc_fail text=%.40s", text);
     return false;
   }
-  uint32_t delay_ms = replyDelayMillis(pkt);
+  // RFC-0002 §8: delay_ms from McRpc::ReplyJitter (0 for events / addressed).
   sendFlood(pkt, delay_ms);
   _tx_ok++;
   MESH_DEBUG_PRINTLN("mcRPC TX ok #%lu q=%u delay=%lums text=%.40s",
@@ -188,34 +191,14 @@ bool McRpcMesh::trySendNow(const char* text) {
   return true;
 }
 
-uint32_t McRpcMesh::replyDelayMillis(mesh::Packet* pkt) {
-  // Mirror SensorMesh multi-responder: widen getRetransmitDelay x4, then mix
-  // a stable per-node slot so identical RNG seeds still stagger.
-  uint32_t base = getRetransmitDelay(pkt);
-  if (base == 0) {
-    base = 40;  // floor when airtime estimate is tiny
-  }
-  const char* name = nodeName();
-  uint32_t h = 2166136261u;
-  if (name != nullptr) {
-    for (const unsigned char* p = (const unsigned char*)name; *p; ++p) {
-      h ^= *p;
-      h *= 16777619u;
-    }
-  }
-  return base * 4u + (h % 8u) * base;
-}
-
 void McRpcMesh::drainTxQueue() {
   while (_tx_q_count > 0) {
     if (_mgr->getOutboundTotal() > 0) return;
     const char* text = _tx_queue[_tx_q_head];
-    // Decrement busy counter pretick — trySendNow increments drop_busy if blocked.
+    uint32_t delay_ms = _tx_delay_ms[_tx_q_head];
     uint32_t busy_before = _tx_drop_busy;
-    if (!trySendNow(text)) {
-      // Still busy or alloc fail: keep head; alloc failures drop the slot.
+    if (!trySendNow(text, delay_ms)) {
       if (_tx_drop_busy > busy_before) return;
-      // alloc failed — drop this queued item to avoid wedging the queue
       _tx_q_head = (uint8_t)((_tx_q_head + 1) % MCRPC_TX_QUEUE);
       _tx_q_count--;
       return;
@@ -226,16 +209,22 @@ void McRpcMesh::drainTxQueue() {
 }
 
 bool McRpcMesh::sendChannelText(const char* text) {
-  if (!_channel_ready || text == nullptr || text[0] == 0) return false;
-  if (trySendNow(text)) return true;
-  // Radio busy or momentary alloc failure: queue for loopMcRpc drain.
-  // Previously a single-flight gate silently discarded replies under burst
-  // load (stress: many handled requests, few on-air responses).
-  return enqueueTx(text);
+  return sendChannelText(text, 0);
 }
 
-bool McRpcMesh::publishThunk(const char* text, void* ctx) {
-  return static_cast<McRpcMesh*>(ctx)->sendChannelText(text);
+bool McRpcMesh::sendChannelText(const char* text, uint32_t delay_ms) {
+  if (!_channel_ready || text == nullptr || text[0] == 0) return false;
+  if (trySendNow(text, delay_ms)) return true;
+  return enqueueTx(text, delay_ms);
+}
+
+bool McRpcMesh::publishExThunk(const char* text, uint32_t delay_ms, void* ctx) {
+  return static_cast<McRpcMesh*>(ctx)->sendChannelText(text, delay_ms);
+}
+
+uint16_t McRpcMesh::entropyThunk(void* ctx) {
+  McRpcMesh* self = static_cast<McRpcMesh*>(ctx);
+  return (uint16_t)self->getRNG()->nextInt(0, 65535);
 }
 
 void McRpcMesh::gpsDoneThunk(bool ok, float lat, float lon, float alt, int sats, float hdop,
