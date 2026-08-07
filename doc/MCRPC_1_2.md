@@ -1,6 +1,6 @@
 # mcRPC 1.2 consumer notes (MeshCore)
 
-Depends on **mcrpc `v1.2.1`** (`platformio.ini` `[mcrpc_lib]`).
+Depends on **mcrpc `v1.2.3`** (`platformio.ini` `[mcrpc_lib]`).
 
 See [RFC-0002](https://github.com/tj57/mcrpc/blob/main/docs/rfc/RFC-0002-mcrpc-1.2-slim-call.md)
 in the mcrpc tree (`/data/projects/mcrpc/docs/rfc/RFC-0002-mcrpc-1.2-slim-call.md`).
