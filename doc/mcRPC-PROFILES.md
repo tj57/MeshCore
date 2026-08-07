@@ -19,7 +19,7 @@ UI tag may mirror profile (`tag=`); **never** use tag/profile as an RF address (
 Private channel name + PSK for on-air tests live in **gitignored**
 `platformio.secrets.ini` (see `platformio.secrets.ini.example`).
 
-Typical HA QA channel: name `mcCtrl`, PSK as **32 hex chars** (`MCRPC_DEFAULT_PSK_HEX`).
+Typical HA QA channel: name `lab-channel`, PSK as **32 hex chars** (`MCRPC_DEFAULT_PSK_HEX`).
 Use `MCRPC_FORCE_CHANNEL_DEFAULTS=1` when flashing so `/mcrpc_cfg` cannot keep an old secret.
 
 ## Profile → commands

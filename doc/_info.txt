@@ -1,0 +1,10 @@
+# Heltec
+docker run --rm -v /data/projects/meshcore:/workspace -v /data/projects/mcrpc:/mcrpc \
+  -v heltec-button_pio-cache:/opt/platformio -e PLATFORMIO_CORE_DIR=/opt/platformio \
+  --entrypoint bash meshcore-heltec-button:latest -lc \
+  'pio run -e Heltec_v3_mcrpc_button -t upload --upload-port /dev/ttyUSB0'
+# LW010 (port dostosuj)
+docker run --rm -v /data/projects/meshcore:/workspace -v /data/projects/mcrpc:/mcrpc \
+  -v meshcore_pio-cache:/opt/platformio -e PLATFORMIO_CORE_DIR=/opt/platformio \
+  --entrypoint bash meshcore-lw010-gps:latest -lc \
+  'pio run -e LW010_mcrpc_gps -t upload --upload-port /dev/ttyACM0'

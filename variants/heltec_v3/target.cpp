@@ -27,9 +27,9 @@ AutoDiscoverRTCClock rtc_clock(fallback_clock);
   // Leave VEXT polarity as board.begin() sets it (LOW → OLED powered on Heltec V3).
   // Do not pass periph_power here — claim()/release() polarity would blank the panel.
   DISPLAY_CLASS display;
-  MomentaryButton user_btn(PIN_USER_BTN, 1000, true);
+  MomentaryButton user_btn(PIN_USER_BTN, 1000, true, true);  // INPUT_PULLUP (PRG → GND)
 #if defined(PIN_USER_BTN2) && (PIN_USER_BTN2 >= 0)
-  MomentaryButton user_btn2(PIN_USER_BTN2, 1000, true);
+  MomentaryButton user_btn2(PIN_USER_BTN2, 1000, true, true);
 #endif
 #endif
 

@@ -34,9 +34,7 @@ public:
     _name = name ? name : "";
     _profile = profile ? profile : "";
     _channel = channel ? channel : "";
-    if (_btn1) _btn1->begin();
-    if (_btn2) _btn2->begin();
-    // display.begin() must already have been called by the board setup.
+    // Buttons are begun in setup() unconditionally — do not gate on OLED.
     _display->turnOn();
     _ok = true;
     _auto_off = millis() + AUTO_OFF_MS;
@@ -75,7 +73,7 @@ private:
     _display->setColor(DisplayDriver::LIGHT);
 
     _display->setCursor(0, 0);
-    _display->print("mcRPC button");
+    _display->print("Heltec_v3a");
 
     _display->setCursor(0, 14);
     snprintf(line, sizeof(line), "name %s", _name);

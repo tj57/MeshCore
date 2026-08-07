@@ -13,9 +13,9 @@ McRpcMesh the_mesh(board, radio_driver, *new ArduinoMillis(), fast_rng, rtc_cloc
 #if defined(PIN_USER_BTN) && (PIN_USER_BTN >= 0)
 #ifndef DISPLAY_CLASS
 // Boards without DISPLAY_CLASS still need a button instance for mcRPC.
-static MomentaryButton user_btn(PIN_USER_BTN, 1000, true);
+static MomentaryButton user_btn(PIN_USER_BTN, 1000, true, true);
 #if defined(PIN_USER_BTN2) && (PIN_USER_BTN2 >= 0)
-static MomentaryButton user_btn2(PIN_USER_BTN2, 1000, true);
+static MomentaryButton user_btn2(PIN_USER_BTN2, 1000, true, true);
 #endif
 #endif
 #define MCRPC_HAS_USER_BTN 1
@@ -41,6 +41,28 @@ void setup() {
   delay(1000);
 
   board.begin();
+
+  // Buttons must init even if OLED fails (1.2 regression: begin was gated on display).
+#if defined(MCRPC_HAS_USER_BTN)
+  user_btn.begin();
+#if defined(PIN_USER_BTN2) && (PIN_USER_BTN2 >= 0)
+  user_btn2.begin();
+#endif
+#endif
+
+#ifdef DISPLAY_CLASS
+  // Init OLED early (VEXT already on after board.begin) — same order as companion/sensor.
+  bool oled_ok = display.begin();
+  Serial.println(oled_ok ? "OLED ok" : "OLED FAIL");
+  if (oled_ok) {
+    display.startFrame();
+    display.setTextSize(1);
+    display.setColor(DisplayDriver::LIGHT);
+    display.setCursor(0, 0);
+    display.print("Please wait...");
+    display.endFrame();
+  }
+#endif
 
   if (!radio_init()) {
     halt();
@@ -85,8 +107,12 @@ void setup() {
   the_mesh.begin(fs);
   the_mesh.beginMcRpc(fs);
 
+  Serial.print("mcRPC name=");
+  Serial.println(the_mesh.nodeName() ? the_mesh.nodeName() : "?");
+
 #ifdef DISPLAY_CLASS
-  if (display.begin()) {
+  // UI works when OLED began; buttons already live without it.
+  if (oled_ok) {
     ui_task.begin(the_mesh.nodeName(), the_mesh.profile(), the_mesh.rpc().config().channelName());
   }
 #endif

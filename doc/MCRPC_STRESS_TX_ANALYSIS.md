@@ -91,4 +91,4 @@ Timeouts, policy denials, and dedup reduce correlated responses under overload.
 | Diagnostics | Opaque | `tx_pipeline` + classified traces |
 
 Re-run stress with [STRESS_METHODOLOGY.md](https://github.com/tj57/meshcore-ha/blob/mcrpc/docs/STRESS_METHODOLOGY.md)
-on the private channel only (Config Entry title may be `mcCtrl`).
+on the private channel only (Config Entry title may be `lab-channel`).

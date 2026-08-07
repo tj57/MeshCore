@@ -16,7 +16,7 @@ Build flags:
 
 | Flag | Meaning |
 |------|---------|
-| `MCRPC_DEFAULT_CHANNEL` | Channel name string (e.g. `mcCtrl`) |
+| `MCRPC_DEFAULT_CHANNEL` | Channel name string (e.g. `lab-channel`) |
 | `MCRPC_DEFAULT_PSK` | Optional ASCII ≤16 bytes (legacy lab) |
 | `MCRPC_DEFAULT_PSK_HEX` | **Preferred**: 32 hex chars → 16 raw bytes (same form as HA / companion) |
 | `MCRPC_FORCE_CHANNEL_DEFAULTS` | If `1`, overwrite `/mcrpc_cfg` channel+PSK from build flags each boot |

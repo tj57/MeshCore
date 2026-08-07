@@ -57,8 +57,8 @@ Optional — disabled until **Configure → Mesh Node Requests (mcRPC)**.
 
 That section configures listening channels, accepted addressing, allowed senders,
 reply identity, and diagnostics. **Public is out of scope for mcRPC** (MeshCore
-Chat only). Bare commands off by default. Config Entry title may stay **mcCtrl**
-while the production device/channel is **mcYogi**. See HA `docs/MCRPC.md`,
+Chat only). Bare commands off by default. Config Entry title may stay **lab-channel**
+while the production device/channel is **ha-peer**. See HA `docs/MCRPC.md`,
 `docs/QA_CHANNEL_POLICY.md`, `docs/STRESS_METHODOLOGY.md`.
 
 Docs in the HA repo: `docs/MCRPC.md`, `docs/ARCHITECTURE_MCRPC.md`,
