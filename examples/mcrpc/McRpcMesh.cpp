@@ -179,11 +179,31 @@ bool McRpcMesh::trySendNow(const char* text) {
     MESH_DEBUG_PRINTLN("mcRPC TX drop alloc_fail text=%.40s", text);
     return false;
   }
-  sendFlood(pkt);
+  uint32_t delay_ms = replyDelayMillis(pkt);
+  sendFlood(pkt, delay_ms);
   _tx_ok++;
-  MESH_DEBUG_PRINTLN("mcRPC TX ok #%lu q=%u text=%.40s", (unsigned long)_tx_ok,
-                     (unsigned)_tx_q_count, text);
+  MESH_DEBUG_PRINTLN("mcRPC TX ok #%lu q=%u delay=%lums text=%.40s",
+                     (unsigned long)_tx_ok, (unsigned)_tx_q_count,
+                     (unsigned long)delay_ms, text);
   return true;
+}
+
+uint32_t McRpcMesh::replyDelayMillis(mesh::Packet* pkt) {
+  // Mirror SensorMesh multi-responder: widen getRetransmitDelay x4, then mix
+  // a stable per-node slot so identical RNG seeds still stagger.
+  uint32_t base = getRetransmitDelay(pkt);
+  if (base == 0) {
+    base = 40;  // floor when airtime estimate is tiny
+  }
+  const char* name = nodeName();
+  uint32_t h = 2166136261u;
+  if (name != nullptr) {
+    for (const unsigned char* p = (const unsigned char*)name; *p; ++p) {
+      h ^= *p;
+      h *= 16777619u;
+    }
+  }
+  return base * 4u + (h % 8u) * base;
 }
 
 void McRpcMesh::drainTxQueue() {

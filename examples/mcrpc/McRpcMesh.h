@@ -23,7 +23,7 @@
 #endif
 
 #ifndef MCRPC_FW_VERSION
-#define MCRPC_FW_VERSION "mcrpc-1.1.0"
+#define MCRPC_FW_VERSION "mcrpc-1.2.1"
 #endif
 
 /**
@@ -110,6 +110,8 @@ private:
   bool enqueueTx(const char* text);
   bool trySendNow(const char* text);
   void drainTxQueue();
+  /** Multi-responder stagger (SensorMesh-style) so ``all`` replies don't collide. */
+  uint32_t replyDelayMillis(mesh::Packet* pkt);
 
   static bool publishThunk(const char* text, void* ctx);
   static void gpsDoneThunk(bool ok, float lat, float lon, float alt, int sats, float hdop,
